@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 from runewall.core.config import config_path, ensure_config, format_config_data, load_config, load_config_data, set_config_value
-from runewall.core.db import database_path, initialize_database
+from runewall.core.db import database_path, initialize_database, project_state_dir
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
 from runewall.maps.executor import MapExecutionError, UnsupportedExecutionError, execute_map_action
@@ -16,6 +16,7 @@ from runewall.maps.planner import DryRunPlanner, dry_run_result, missing_inputs_
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
 from runewall.core.models import Action
 from runewall.core.rollback import RollbackEngine
+from runewall.core.snapshot import cleanup_snapshots
 from runewall.translate import read_url
 
 
@@ -62,6 +63,9 @@ def build_parser() -> argparse.ArgumentParser:
     rollback_parser = subcommands.add_parser("rollback", help="Rollback a recorded action.")
     rollback_parser.add_argument("action_id", nargs="?")
     rollback_parser.add_argument("--last", action="store_true")
+    cleanup_parser = subcommands.add_parser("cleanup", help="Clean up old Runewall data.")
+    cleanup_subcommands = cleanup_parser.add_subparsers(dest="cleanup_command", required=True)
+    cleanup_subcommands.add_parser("snapshots", help="Delete snapshot directories older than retention period.")
     return parser
 
 
@@ -444,6 +448,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Rolled back action {args.action_id}.")
             return 0
         parser.error("rollback requires an action ID or --last")
+
+    if args.command == "cleanup":
+        if args.cleanup_command == "snapshots":
+            snapshots_dir = project_state_dir(Path.cwd()) / "snapshots"
+            if not snapshots_dir.is_dir():
+                print("No snapshots directory found.")
+                return 0
+            deleted = cleanup_snapshots(root=Path.cwd())
+            print(f"Deleted {deleted} old snapshot(s).")
+            return 0
 
     parser.error(f"Unknown command: {args.command}")
     return 2

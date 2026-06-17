@@ -3,12 +3,27 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shutil
+import time
 
 from .config import load_config
 from .db import project_state_dir
 from .models import Action, Snapshot
 
 DEFAULT_MAX_FILE_SNAPSHOT_SIZE = 500 * 1024 * 1024
+
+
+def cleanup_snapshots(root: Path | None = None, snapshot_days: int | None = None) -> int:
+    resolved_root = (root or Path.cwd()).resolve()
+    if snapshot_days is None:
+        snapshot_days = load_config(resolved_root).retention.snapshot_days
+    snapshots_dir = project_state_dir(resolved_root) / "snapshots"
+    cutoff = time.time() - snapshot_days * 86400
+    deleted = 0
+    for entry in snapshots_dir.iterdir():
+        if entry.is_dir() and entry.stat().st_mtime < cutoff:
+            shutil.rmtree(entry)
+            deleted += 1
+    return deleted
 
 
 class SnapshotEngine:

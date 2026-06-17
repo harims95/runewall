@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,7 +14,7 @@ if str(ROOT) not in sys.path:
 
 from runewall.core.log import ActionLog
 from runewall.core.models import Action
-from runewall.core.snapshot import SnapshotEngine
+from runewall.core.snapshot import SnapshotEngine, cleanup_snapshots
 
 
 class SnapshotEngineTests(unittest.TestCase):
@@ -129,6 +131,82 @@ class SnapshotEngineTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "File is too large to snapshot"):
                 engine.create_snapshot(Action(action_type="file.write", target="too-large.bin"))
+
+
+class SnapshotCleanupTests(unittest.TestCase):
+    def _make_snapshots_dir(self, root: Path) -> Path:
+        snapshots_dir = root / ".runewall" / "snapshots"
+        snapshots_dir.mkdir(parents=True, exist_ok=True)
+        return snapshots_dir
+
+    def _make_snapshot_dir(self, snapshots_dir: Path, name: str, age_days: float) -> Path:
+        snap = snapshots_dir / name
+        snap.mkdir()
+        old_time = time.time() - age_days * 86400
+        os.utime(snap, (old_time, old_time))
+        return snap
+
+    def test_old_snapshot_is_deleted(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            snapshots_dir = self._make_snapshots_dir(root)
+            snap = self._make_snapshot_dir(snapshots_dir, "old_snap", age_days=31)
+
+            deleted = cleanup_snapshots(root=root, snapshot_days=30)
+
+            self.assertEqual(deleted, 1)
+            self.assertFalse(snap.exists())
+
+    def test_recent_snapshot_is_kept(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            snapshots_dir = self._make_snapshots_dir(root)
+            snap = self._make_snapshot_dir(snapshots_dir, "recent_snap", age_days=1)
+
+            deleted = cleanup_snapshots(root=root, snapshot_days=30)
+
+            self.assertEqual(deleted, 0)
+            self.assertTrue(snap.exists())
+
+    def test_config_retention_value_is_respected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_dir = root / ".runewall"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "config.toml").write_text(
+                "[retention]\nsnapshot_days = 7\n", encoding="utf-8"
+            )
+            snapshots_dir = self._make_snapshots_dir(root)
+            old_snap = self._make_snapshot_dir(snapshots_dir, "old_snap", age_days=8)
+            new_snap = self._make_snapshot_dir(snapshots_dir, "new_snap", age_days=6)
+
+            deleted = cleanup_snapshots(root=root)
+
+            self.assertEqual(deleted, 1)
+            self.assertFalse(old_snap.exists())
+            self.assertTrue(new_snap.exists())
+
+    def test_default_retention_is_30_days_when_config_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            snapshots_dir = self._make_snapshots_dir(root)
+            old_snap = self._make_snapshot_dir(snapshots_dir, "old_snap", age_days=31)
+            new_snap = self._make_snapshot_dir(snapshots_dir, "new_snap", age_days=29)
+
+            deleted = cleanup_snapshots(root=root)
+
+            self.assertEqual(deleted, 1)
+            self.assertFalse(old_snap.exists())
+            self.assertTrue(new_snap.exists())
+
+    def test_empty_snapshots_directory_deletes_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._make_snapshots_dir(root)
+
+            deleted = cleanup_snapshots(root=root, snapshot_days=30)
+
+            self.assertEqual(deleted, 0)
 
 
 if __name__ == "__main__":

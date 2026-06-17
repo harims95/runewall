@@ -1204,5 +1204,49 @@ class CliTests(unittest.TestCase):
             self.assertEqual(output.getvalue().strip(), "Read failed: network down")
 
 
+    def test_cleanup_snapshots_with_no_snapshots_dir_exits_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["cleanup", "snapshots"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(output.getvalue().strip(), "No snapshots directory found.")
+
+    def test_cleanup_snapshots_reports_deleted_count(self) -> None:
+        import os as _os
+        import time as _time
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                snapshots_dir = Path.cwd() / ".runewall" / "snapshots"
+                snapshots_dir.mkdir(parents=True, exist_ok=True)
+                old_snap = snapshots_dir / "old_snap"
+                old_snap.mkdir()
+                old_time = _time.time() - 31 * 86400
+                _os.utime(old_snap, (old_time, old_time))
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["cleanup", "snapshots"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Deleted 1 old snapshot(s).", output.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
