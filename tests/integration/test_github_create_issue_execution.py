@@ -39,6 +39,11 @@ class GitHubCreateIssueExecutionIntegrationTests(unittest.TestCase):
             try:
                 os.chdir(temp_dir)
                 main(["init"])
+                config_file = Path.cwd() / ".runewall" / "config.toml"
+                config_file.write_text(
+                    config_file.read_text(encoding="utf-8").replace("allow_execute = false", "allow_execute = true"),
+                    encoding="utf-8",
+                )
                 output.truncate(0)
                 output.seek(0)
                 with redirect_stdout(output):

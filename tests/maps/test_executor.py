@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -13,10 +14,42 @@ from runewall.maps.executor import MapExecutionError, UnsupportedExecutionError,
 
 
 class MapExecutorTests(unittest.TestCase):
+    def _write_allow_execute(self, root: Path, enabled: bool) -> None:
+        config_dir = root / ".runewall"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.toml").write_text(
+            f"[maps]\nallow_execute = {'true' if enabled else 'false'}\n",
+            encoding="utf-8",
+        )
+
+    def test_execute_is_blocked_when_config_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action(
+                    "github",
+                    "create_issue",
+                    {"repo": "user/repo", "title": "Bug report"},
+                    root=Path(temp_dir),
+                )
+
+        self.assertEqual(
+            str(context.exception),
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+        )
+
     @patch.dict("os.environ", {}, clear=True)
     def test_execute_github_create_issue_with_missing_token_fails_clearly(self) -> None:
-        with self.assertRaises(MapExecutionError) as context:
-            execute_map_action("github", "create_issue", {"repo": "user/repo", "title": "Bug report"})
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action(
+                    "github",
+                    "create_issue",
+                    {"repo": "user/repo", "title": "Bug report"},
+                    root=root,
+                )
 
         self.assertEqual(
             str(context.exception),
@@ -35,11 +68,15 @@ class MapExecutorTests(unittest.TestCase):
 
         mocked_post.return_value = Response()
 
-        result = execute_map_action(
-            "github",
-            "create_issue",
-            {"repo": "user/repo", "title": "Bug report", "body": "Details"},
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            result = execute_map_action(
+                "github",
+                "create_issue",
+                {"repo": "user/repo", "title": "Bug report", "body": "Details"},
+                root=root,
+            )
 
         self.assertEqual(
             result,
@@ -52,7 +89,7 @@ class MapExecutorTests(unittest.TestCase):
     @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-token"}, clear=True)
     def test_unsupported_site_flow_execution_fails_clearly(self) -> None:
         with self.assertRaises(UnsupportedExecutionError) as context:
-            execute_map_action("github", "delete_repository", {"repo": "user/repo"})
+            execute_map_action("github", "delete_repository", {"repo": "user/repo"}, root=Path.cwd())
 
         self.assertEqual(
             str(context.exception),

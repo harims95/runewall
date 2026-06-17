@@ -474,6 +474,46 @@ class CliTests(unittest.TestCase):
         )
         self.assertNotIn("Runewall is not initialized; dry run was not logged.", output.getvalue())
 
+    def test_act_execute_is_blocked_by_default_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--execute",
+                            "--input",
+                            "repo=user/repo",
+                            "--input",
+                            "title=Bug report",
+                        ]
+                    )
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual(action.action_type, "map.execute")
+        self.assertEqual(action.status, "failed")
+        self.assertEqual(
+            action.result,
+            {"error": "Map execution is disabled by config. Set [maps] allow_execute = true to enable."},
+        )
+        self.assertEqual(
+            output.getvalue().strip(),
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+        )
+
     def test_act_dry_run_failed_logs_failed_if_initialized(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
@@ -508,6 +548,35 @@ class CliTests(unittest.TestCase):
             {"error": "Missing required inputs: title"},
         )
 
+    @patch.dict("os.environ", {}, clear=True)
+    def test_act_execute_is_blocked_when_config_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--execute",
+                            "--input",
+                            "repo=user/repo",
+                            "--input",
+                            "title=Bug report",
+                        ]
+                    )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            output.getvalue().strip(),
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+        )
+
     def test_act_dry_run_unknown_site_fails_clearly(self) -> None:
         output = io.StringIO()
 
@@ -527,34 +596,18 @@ class CliTests(unittest.TestCase):
         self.assertEqual(output.getvalue().strip(), "Flow not found for GitHub: unknown_flow")
 
     @patch.dict("os.environ", {}, clear=True)
-    def test_act_execute_missing_token_fails_clearly(self) -> None:
-        output = io.StringIO()
-
-        with redirect_stdout(output):
-            exit_code = main(
-                [
-                    "act",
-                    "github",
-                    "create_issue",
-                    "--execute",
-                    "--input",
-                    "repo=user/repo",
-                    "--input",
-                    "title=Bug report",
-                ]
-            )
-
-        self.assertEqual(exit_code, 1)
-        self.assertEqual(output.getvalue().strip(), "GITHUB_TOKEN is required to execute github:create_issue.")
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_act_execute_missing_token_logs_failed_if_initialized(self) -> None:
+    def test_act_execute_allowed_reaches_existing_token_checks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
             output = io.StringIO()
             try:
                 os.chdir(temp_dir)
                 main(["init"])
+                config_file = Path.cwd() / ".runewall" / "config.toml"
+                config_file.write_text(
+                    config_file.read_text(encoding="utf-8").replace("allow_execute = false", "allow_execute = true"),
+                    encoding="utf-8",
+                )
                 output.truncate(0)
                 output.seek(0)
                 with redirect_stdout(output):
@@ -581,6 +634,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(action.status, "failed")
         self.assertEqual(action.result, {"error": "GITHUB_TOKEN is required to execute github:create_issue."})
         self.assertNotIn("GITHUB_TOKEN", str(action.params))
+        self.assertEqual(output.getvalue().strip(), "GITHUB_TOKEN is required to execute github:create_issue.")
 
     @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-token"}, clear=True)
     @patch("runewall.cli.main.execute_map_action")
@@ -595,6 +649,11 @@ class CliTests(unittest.TestCase):
             try:
                 os.chdir(temp_dir)
                 main(["init"])
+                config_file = Path.cwd() / ".runewall" / "config.toml"
+                config_file.write_text(
+                    config_file.read_text(encoding="utf-8").replace("allow_execute = false", "allow_execute = true"),
+                    encoding="utf-8",
+                )
                 output.truncate(0)
                 output.seek(0)
                 with redirect_stdout(output):
@@ -631,22 +690,25 @@ class CliTests(unittest.TestCase):
 
     @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-token"}, clear=True)
     def test_act_execute_unsupported_site_flow_fails_clearly(self) -> None:
-        output = io.StringIO()
-
-        with redirect_stdout(output):
-            exit_code = main(
-                [
-                    "act",
-                    "github",
-                    "delete_repository",
-                    "--execute",
-                    "--input",
-                    "repo=user/repo",
-                ]
-            )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "vercel",
+                            "list_projects",
+                            "--execute",
+                        ]
+                    )
+            finally:
+                os.chdir(original_cwd)
 
         self.assertEqual(exit_code, 1)
-        self.assertEqual(output.getvalue().strip(), "Flow not found for GitHub: delete_repository")
+        self.assertEqual(output.getvalue().strip(), "Execution is not supported for vercel:list_projects.")
 
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
