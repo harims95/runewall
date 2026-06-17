@@ -11,6 +11,14 @@ class MapValidationError(ValueError):
     """Raised when a site map is missing required fields."""
 
 
+class SiteMapNotFoundError(LookupError):
+    """Raised when a bundled site map cannot be found."""
+
+
+class FlowNotFoundError(LookupError):
+    """Raised when a flow does not exist in a site map."""
+
+
 @dataclass(frozen=True)
 class SiteMap:
     schema_version: str
@@ -40,6 +48,21 @@ class SiteMapRegistry:
             if normalized_key in {filename_key, name_key}:
                 return site_map
         return None
+
+    def require_site(self, site_key: str) -> SiteMap:
+        site_map = self.load_site(site_key)
+        if site_map is None:
+            raise SiteMapNotFoundError(f"Site map not found: {site_key}")
+        return site_map
+
+    def get_flow(self, site_map: SiteMap, flow_name: str) -> dict[str, Any] | None:
+        return site_map.flows.get(flow_name)
+
+    def require_flow(self, site_map: SiteMap, flow_name: str) -> dict[str, Any]:
+        flow = self.get_flow(site_map, flow_name)
+        if flow is None:
+            raise FlowNotFoundError(f"Flow not found for {site_map.site_name}: {flow_name}")
+        return flow
 
     def load_map(self, filename: str) -> SiteMap:
         map_resource = resources.files("runewall.maps").joinpath("sites", filename)

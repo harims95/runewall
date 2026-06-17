@@ -7,6 +7,8 @@ from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
 from runewall.maps import SiteMapRegistry
+from runewall.maps.planner import DryRunPlanner, render_plan
+from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
 from runewall.core.models import Action
 from runewall.core.rollback import RollbackEngine
 from runewall.translate import read_url
@@ -21,6 +23,11 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
     subcommands.add_parser("log", help="Show recorded actions.")
+    act_parser = subcommands.add_parser("act", help="Plan a mapped site flow.")
+    act_parser.add_argument("site")
+    act_parser.add_argument("flow")
+    act_parser.add_argument("--dry-run", action="store_true")
+    act_parser.add_argument("--input", action="append", default=[])
     maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
     maps_subcommands.add_parser("list", help="List bundled site maps.")
@@ -70,6 +77,34 @@ def main(argv: list[str] | None = None) -> int:
                     ]
                 )
             )
+        return 0
+    if args.command == "act":
+        if not args.dry_run:
+            print("Only --dry-run is supported right now.")
+            return 1
+
+        inputs: dict[str, str] = {}
+        for item in args.input:
+            if "=" not in item:
+                print(f"Invalid input: {item}")
+                return 1
+            key, value = item.split("=", 1)
+            inputs[key] = value
+
+        planner = DryRunPlanner()
+        try:
+            plan = planner.build_plan(args.site, args.flow, inputs)
+        except SiteMapNotFoundError as error:
+            print(str(error))
+            return 1
+        except FlowNotFoundError as error:
+            print(str(error))
+            return 1
+
+        print(render_plan(plan))
+        if plan.missing_inputs:
+            print(f"Missing required inputs: {', '.join(plan.missing_inputs)}")
+            return 1
         return 0
     if args.command == "maps":
         registry = SiteMapRegistry()

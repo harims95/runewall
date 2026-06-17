@@ -90,6 +90,74 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
 
+    def test_act_dry_run_for_github_create_issue(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(
+                [
+                    "act",
+                    "github",
+                    "create_issue",
+                    "--dry-run",
+                    "--input",
+                    "repo=user/repo",
+                    "--input",
+                    "title=Bug report",
+                    "--input",
+                    "body=Details",
+                ]
+            )
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: GitHub", rendered)
+        self.assertIn("Flow name: create_issue", rendered)
+        self.assertIn("Risk level: low", rendered)
+        self.assertIn("Reversible: True", rendered)
+        self.assertIn("Requires auth: True", rendered)
+        self.assertIn("- repo=user/repo", rendered)
+        self.assertIn("- title=Bug report", rendered)
+        self.assertIn("Missing inputs: none", rendered)
+
+    def test_act_dry_run_missing_required_input_fails_clearly(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(
+                [
+                    "act",
+                    "github",
+                    "create_issue",
+                    "--dry-run",
+                    "--input",
+                    "repo=user/repo",
+                ]
+            )
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Missing inputs: title", rendered)
+        self.assertIn("Missing required inputs: title", rendered)
+
+    def test_act_dry_run_unknown_site_fails_clearly(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["act", "unknown", "create_issue", "--dry-run"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
+
+    def test_act_dry_run_unknown_flow_fails_clearly(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["act", "github", "unknown_flow", "--dry-run"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(output.getvalue().strip(), "Flow not found for GitHub: unknown_flow")
+
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.maps import MapValidationError, SiteMapRegistry
+from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
 
 
 class SiteMapRegistryTests(unittest.TestCase):
@@ -46,6 +47,23 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertIsNotNone(site_map)
         assert site_map is not None
         self.assertEqual(site_map.site_name, "GitHub")
+
+    def test_require_site_raises_clear_error_for_unknown_site(self) -> None:
+        registry = SiteMapRegistry()
+
+        with self.assertRaises(SiteMapNotFoundError) as context:
+            registry.require_site("unknown")
+
+        self.assertEqual(str(context.exception), "Site map not found: unknown")
+
+    def test_require_flow_raises_clear_error_for_unknown_flow(self) -> None:
+        registry = SiteMapRegistry()
+        site_map = registry.require_site("github")
+
+        with self.assertRaises(FlowNotFoundError) as context:
+            registry.require_flow(site_map, "unknown_flow")
+
+        self.assertEqual(str(context.exception), "Flow not found for GitHub: unknown_flow")
 
 
 if __name__ == "__main__":
