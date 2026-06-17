@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps.planner import DryRunPlanner, render_plan
+from runewall.maps.planner import DryRunPlanner, dry_run_result, missing_inputs_error, render_plan
 
 
 class DryRunPlannerTests(unittest.TestCase):
@@ -33,6 +33,15 @@ class DryRunPlannerTests(unittest.TestCase):
         self.assertIn("Provided inputs:", rendered)
         self.assertIn("- repo=user/repo", rendered)
         self.assertIn("Missing inputs: none", rendered)
+        self.assertEqual(
+            dry_run_result(plan),
+            {
+                "risk_level": "low",
+                "reversible": True,
+                "requires_auth": True,
+                "executed": False,
+            },
+        )
 
     def test_missing_required_input_fails_clearly(self) -> None:
         planner = DryRunPlanner()
@@ -40,6 +49,7 @@ class DryRunPlannerTests(unittest.TestCase):
         plan = planner.build_plan("github", "create_issue", {"repo": "user/repo"})
 
         self.assertEqual(plan.missing_inputs, ["title"])
+        self.assertEqual(missing_inputs_error(plan), "Missing required inputs: title")
 
 
 if __name__ == "__main__":

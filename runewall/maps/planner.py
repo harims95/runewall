@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .registry import SiteMap, SiteMapRegistry
+from .registry import SiteMapRegistry
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,21 @@ class DryRunPlanner:
             for input_name, input_data in flow_inputs.items()
             if isinstance(input_data, dict) and input_data.get("required") is True and input_name not in inputs
         ]
+
+
+def dry_run_result(plan: DryRunPlan) -> dict[str, Any]:
+    return {
+        "risk_level": plan.risk_level,
+        "reversible": plan.reversible,
+        "requires_auth": plan.requires_auth,
+        "executed": False,
+    }
+
+
+def missing_inputs_error(plan: DryRunPlan) -> str | None:
+    if not plan.missing_inputs:
+        return None
+    return f"Missing required inputs: {', '.join(plan.missing_inputs)}"
 
 
 def render_plan(plan: DryRunPlan) -> str:

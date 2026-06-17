@@ -91,23 +91,28 @@ class CliTests(unittest.TestCase):
         self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
 
     def test_act_dry_run_for_github_create_issue(self) -> None:
-        output = io.StringIO()
-
-        with redirect_stdout(output):
-            exit_code = main(
-                [
-                    "act",
-                    "github",
-                    "create_issue",
-                    "--dry-run",
-                    "--input",
-                    "repo=user/repo",
-                    "--input",
-                    "title=Bug report",
-                    "--input",
-                    "body=Details",
-                ]
-            )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--dry-run",
+                            "--input",
+                            "repo=user/repo",
+                            "--input",
+                            "title=Bug report",
+                            "--input",
+                            "body=Details",
+                        ]
+                    )
+            finally:
+                os.chdir(original_cwd)
 
         rendered = output.getvalue()
         self.assertEqual(exit_code, 0)
@@ -119,6 +124,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("- repo=user/repo", rendered)
         self.assertIn("- title=Bug report", rendered)
         self.assertIn("Missing inputs: none", rendered)
+        self.assertIn("Runewall is not initialized; dry run was not logged.", rendered)
 
     def test_act_dry_run_missing_required_input_fails_clearly(self) -> None:
         output = io.StringIO()
@@ -139,6 +145,82 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("Missing inputs: title", rendered)
         self.assertIn("Missing required inputs: title", rendered)
+
+    def test_act_dry_run_with_init_logs_map_dry_run_success(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--dry-run",
+                            "--input",
+                            "repo=user/repo",
+                            "--input",
+                            "title=Bug report",
+                        ]
+                    )
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual(action.action_type, "map.dry_run")
+        self.assertEqual(action.target, "github:create_issue")
+        self.assertEqual(action.status, "success")
+        self.assertEqual(
+            action.params,
+            {"site": "github", "flow": "create_issue", "inputs": {"repo": "user/repo", "title": "Bug report"}},
+        )
+        self.assertEqual(
+            action.result,
+            {"risk_level": "low", "reversible": True, "requires_auth": True, "executed": False},
+        )
+        self.assertNotIn("Runewall is not initialized; dry run was not logged.", output.getvalue())
+
+    def test_act_dry_run_failed_logs_failed_if_initialized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--dry-run",
+                            "--input",
+                            "repo=user/repo",
+                        ]
+                    )
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual(action.action_type, "map.dry_run")
+        self.assertEqual(action.status, "failed")
+        self.assertEqual(
+            action.result,
+            {"error": "Missing required inputs: title"},
+        )
 
     def test_act_dry_run_unknown_site_fails_clearly(self) -> None:
         output = io.StringIO()
