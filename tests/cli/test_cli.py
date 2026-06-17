@@ -276,20 +276,86 @@ class CliTests(unittest.TestCase):
         },
     )
     def test_read_command_prints_structured_preview(self, mocked_read) -> None:
-        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["read", "https://example.com"])
+            finally:
+                os.chdir(original_cwd)
 
-        with redirect_stdout(output):
-            exit_code = main(["read", "https://example.com"])
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            mocked_read.assert_called_once_with("https://example.com")
+            self.assertIn("Title: Example Page", rendered)
+            self.assertIn("Headings:", rendered)
+            self.assertIn("- Main Heading", rendered)
+            self.assertIn("- Section Heading", rendered)
+            self.assertIn("Text preview:", rendered)
+            self.assertIn("Hello world from Runewall.", rendered)
+            self.assertIn("Runewall is not initialized; read action was not logged.", rendered)
 
-        rendered = output.getvalue()
-        self.assertEqual(exit_code, 0)
-        mocked_read.assert_called_once_with("https://example.com")
-        self.assertIn("Title: Example Page", rendered)
-        self.assertIn("Headings:", rendered)
-        self.assertIn("- Main Heading", rendered)
-        self.assertIn("- Section Heading", rendered)
-        self.assertIn("Text preview:", rendered)
-        self.assertIn("Hello world from Runewall.", rendered)
+    @patch(
+        "runewall.cli.main.read_url",
+        return_value={
+            "url": "https://example.com",
+            "title": "Example Page",
+            "headings": ["Main Heading"],
+            "text": "Hello world from Runewall.",
+        },
+    )
+    def test_read_with_init_logs_web_read_success(self, mocked_read) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["read", "https://example.com"])
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            mocked_read.assert_called_once_with("https://example.com")
+            self.assertIsNotNone(action)
+            assert action is not None
+            self.assertEqual(action.action_type, "web.read")
+            self.assertEqual(action.target, "https://example.com")
+            self.assertEqual(action.status, "success")
+            self.assertEqual(action.params, {"mode": "universal_read"})
+            self.assertEqual(action.result, {"title": "Example Page", "heading_count": 1, "text_length": 26})
+            self.assertNotIn("Runewall is not initialized; read action was not logged.", output.getvalue())
+
+    @patch("runewall.cli.main.read_url", side_effect=RuntimeError("network down"))
+    def test_failed_read_logs_failed_if_db_exists(self, mocked_read) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["read", "https://example.com"])
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 1)
+            mocked_read.assert_called_once_with("https://example.com")
+            self.assertIsNotNone(action)
+            assert action is not None
+            self.assertEqual(action.action_type, "web.read")
+            self.assertEqual(action.status, "failed")
+            self.assertEqual(action.result, {"error": "network down"})
+            self.assertEqual(output.getvalue().strip(), "Read failed: network down")
 
 
 if __name__ == "__main__":

@@ -6,6 +6,7 @@ from pathlib import Path
 from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
+from runewall.core.models import Action
 from runewall.core.rollback import RollbackEngine
 from runewall.translate import read_url
 
@@ -90,7 +91,40 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
     if args.command == "read":
-        content = read_url(args.url)
+        log = ActionLog.open_existing(root=Path.cwd())
+        try:
+            content = read_url(args.url)
+        except Exception as error:
+            if log is not None:
+                log.add_action(
+                    Action(
+                        action_type="web.read",
+                        target=args.url,
+                        status="failed",
+                        params={"mode": "universal_read"},
+                        result={"error": str(error)},
+                        reversible=False,
+                    )
+                )
+            print(f"Read failed: {error}")
+            return 1
+
+        if log is not None:
+            log.add_action(
+                Action(
+                    action_type="web.read",
+                    target=args.url,
+                    status="success",
+                    params={"mode": "universal_read"},
+                    result={
+                        "title": content["title"],
+                        "heading_count": len(content["headings"]),
+                        "text_length": len(content["text"]),
+                    },
+                    reversible=False,
+                )
+            )
+
         preview = content["text"][:200].strip()
         print(f"Title: {content['title']}")
         print("Headings:")
@@ -101,6 +135,8 @@ def main(argv: list[str] | None = None) -> int:
             print("- none")
         print("Text preview:")
         print(preview)
+        if log is None:
+            print("Runewall is not initialized; read action was not logged.")
         return 0
     if args.command == "status":
         db_path = database_path(Path.cwd())
