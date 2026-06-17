@@ -52,7 +52,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(output.getvalue().strip(), EMPTY_LOG_MESSAGE)
 
-    def test_maps_list_prints_github_vercel_and_netlify(self) -> None:
+    def test_maps_list_prints_github_vercel_netlify_and_cloudflare(self) -> None:
         output = io.StringIO()
 
         with redirect_stdout(output):
@@ -67,6 +67,8 @@ class CliTests(unittest.TestCase):
         self.assertIn("https://vercel.com", rendered)
         self.assertIn("Netlify", rendered)
         self.assertIn("https://app.netlify.com", rendered)
+        self.assertIn("Cloudflare", rendered)
+        self.assertIn("https://dash.cloudflare.com", rendered)
 
     def test_maps_path_prints_absolute_bundled_maps_path(self) -> None:
         output = io.StringIO()
@@ -134,6 +136,24 @@ class CliTests(unittest.TestCase):
         self.assertIn("requires_auth: True", rendered)
         self.assertIn("required inputs: none", rendered)
 
+    def test_maps_show_cloudflare_prints_list_zones(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "cloudflare"])
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Cloudflare", rendered)
+        self.assertIn("Base URL: https://dash.cloudflare.com", rendered)
+        self.assertIn("Map version: 0.1.0", rendered)
+        self.assertIn("Schema version: 1.0.0", rendered)
+        self.assertIn("- list_zones", rendered)
+        self.assertIn("risk_level: low", rendered)
+        self.assertIn("reversible: False", rendered)
+        self.assertIn("requires_auth: True", rendered)
+        self.assertIn("required inputs: none", rendered)
+
     def test_maps_show_unknown_site_fails_clearly(self) -> None:
         output = io.StringIO()
 
@@ -154,7 +174,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Bundled maps directory not found: missing-maps-dir")
 
-    def test_maps_validate_prints_ok_for_github_vercel_and_netlify(self) -> None:
+    def test_maps_validate_prints_ok_for_github_vercel_netlify_and_cloudflare(self) -> None:
         output = io.StringIO()
 
         with redirect_stdout(output):
@@ -165,6 +185,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("github (GitHub)\tOK", rendered)
         self.assertIn("vercel (Vercel)\tOK", rendered)
         self.assertIn("netlify (Netlify)\tOK", rendered)
+        self.assertIn("cloudflare (Cloudflare)\tOK", rendered)
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
@@ -312,6 +333,32 @@ class CliTests(unittest.TestCase):
         self.assertIn("- none", rendered)
         self.assertIn("Missing inputs: none", rendered)
         self.assertIn("API path: GET /api/v1/sites", rendered)
+        self.assertIn("Runewall is not initialized; dry run was not logged.", rendered)
+        mocked_execute.assert_not_called()
+
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_dry_run_for_cloudflare_list_zones(self, mocked_execute) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["act", "cloudflare", "list_zones", "--dry-run"])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Cloudflare", rendered)
+        self.assertIn("Flow name: list_zones", rendered)
+        self.assertIn("Risk level: low", rendered)
+        self.assertIn("Reversible: False", rendered)
+        self.assertIn("Requires auth: True", rendered)
+        self.assertIn("Provided inputs:", rendered)
+        self.assertIn("- none", rendered)
+        self.assertIn("Missing inputs: none", rendered)
+        self.assertIn("API path: GET /client/v4/zones", rendered)
         self.assertIn("Runewall is not initialized; dry run was not logged.", rendered)
         mocked_execute.assert_not_called()
 

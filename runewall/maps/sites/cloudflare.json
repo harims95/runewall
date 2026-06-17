@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "site": {
+    "name": "Cloudflare",
+    "base_url": "https://dash.cloudflare.com",
+    "map_version": "0.1.0"
+  },
+  "flows": {
+    "list_zones": {
+      "risk_level": "low",
+      "reversible": false,
+      "requires_auth": true,
+      "inputs": {},
+      "api_path": {
+        "method": "GET",
+        "url": "/client/v4/zones"
+      }
+    }
+  }
+}

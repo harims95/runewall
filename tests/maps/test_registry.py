@@ -44,6 +44,16 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertEqual(site_map.schema_version, "1.0.0")
         self.assertIn("list_sites", site_map.flows)
 
+    def test_registry_loads_cloudflare_json(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_map("cloudflare.json")
+
+        self.assertEqual(site_map.site_name, "Cloudflare")
+        self.assertEqual(site_map.base_url, "https://dash.cloudflare.com")
+        self.assertEqual(site_map.schema_version, "1.0.0")
+        self.assertIn("list_zones", site_map.flows)
+
     def test_invalid_map_raises_clear_error(self) -> None:
         registry = SiteMapRegistry()
 
@@ -94,14 +104,14 @@ class SiteMapRegistryTests(unittest.TestCase):
 
         self.assertEqual(str(context.exception), "Flow not found for GitHub: unknown_flow")
 
-    def test_validate_bundled_maps_passes_with_github_vercel_and_netlify(self) -> None:
+    def test_validate_bundled_maps_passes_with_github_vercel_netlify_and_cloudflare(self) -> None:
         registry = SiteMapRegistry()
 
         results = registry.validate_bundled_maps()
 
         by_key = {result.site_key: result for result in results}
 
-        self.assertEqual(set(by_key), {"github", "vercel", "netlify"})
+        self.assertEqual(set(by_key), {"github", "vercel", "netlify", "cloudflare"})
         self.assertEqual(by_key["github"].site_name, "GitHub")
         self.assertTrue(by_key["github"].ok)
         self.assertIsNone(by_key["github"].error)
@@ -111,6 +121,9 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertEqual(by_key["netlify"].site_name, "Netlify")
         self.assertTrue(by_key["netlify"].ok)
         self.assertIsNone(by_key["netlify"].error)
+        self.assertEqual(by_key["cloudflare"].site_name, "Cloudflare")
+        self.assertTrue(by_key["cloudflare"].ok)
+        self.assertIsNone(by_key["cloudflare"].error)
 
 
 if __name__ == "__main__":
