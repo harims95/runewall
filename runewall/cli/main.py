@@ -17,6 +17,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
     subcommands.add_parser("log", help="Show recorded actions.")
+    subcommands.add_parser("pending", help="Show pending actions.")
     subcommands.add_parser("status", help="Show current Runewall status.")
     approve_parser = subcommands.add_parser("approve", help="Approve a pending action.")
     approve_parser.add_argument("action_id")
@@ -41,6 +42,31 @@ def main(argv: list[str] | None = None) -> int:
         actions = log.list_actions()
         if not actions:
             print(EMPTY_LOG_MESSAGE)
+            return 0
+
+        print("id\ttimestamp\taction_type\ttarget\tstatus")
+        for action in actions:
+            print(
+                "\t".join(
+                    [
+                        action.id,
+                        action.timestamp,
+                        action.action_type,
+                        action.target,
+                        action.status,
+                    ]
+                )
+            )
+        return 0
+    if args.command == "pending":
+        log = ActionLog.open_existing(root=Path.cwd())
+        if log is None:
+            print(NOT_INITIALIZED_MESSAGE)
+            return 0
+
+        actions = log.list_pending_actions()
+        if not actions:
+            print("No pending actions.")
             return 0
 
         print("id\ttimestamp\taction_type\ttarget\tstatus")
