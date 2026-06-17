@@ -120,6 +120,30 @@ runewall rollback --last
 type demo.txt
 ```
 
+## Review flow
+
+Actions with `REVIEW` policy are logged as `pending` and do not execute immediately.
+
+Users can inspect pending actions with:
+
+```bash
+runewall pending
+```
+
+Users can approve an action with:
+
+```bash
+runewall approve ID
+```
+
+Users can reject an action with:
+
+```bash
+runewall reject ID
+```
+
+Approval currently changes status only. Delayed execution after approval is not built yet.
+
 ## Not built yet
 
 - human approval/reject flow
