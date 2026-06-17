@@ -161,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         try:
-            result = execute_map_action(args.site, args.flow, inputs)
+            result = execute_map_action(args.site, args.flow, inputs, root=Path.cwd())
         except (MapExecutionError, UnsupportedExecutionError) as error:
             if log is not None:
                 log.add_action(

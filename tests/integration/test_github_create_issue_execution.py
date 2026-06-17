@@ -20,6 +20,35 @@ from runewall.core.log import ActionLog
 class GitHubCreateIssueExecutionIntegrationTests(unittest.TestCase):
     @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-token"}, clear=True)
     @patch("runewall.maps.executor._httpx_post")
+    def test_default_config_blocks_execution(self, mocked_post) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--execute",
+                            "--input",
+                            "repo=user/repo",
+                            "--input",
+                            "title=Bug report",
+                        ]
+                    )
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Map execution is disabled by config", output.getvalue())
+        mocked_post.assert_not_called()
+
+    @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-token"}, clear=True)
+    @patch("runewall.maps.executor._httpx_post")
     def test_mocked_successful_github_response_logs_map_execute_success(self, mocked_post) -> None:
         class Response:
             status_code = 201

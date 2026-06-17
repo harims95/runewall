@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
+
+from runewall.core.config import load_config
 
 class MapExecutionError(RuntimeError):
     """Raised when mapped execution cannot complete safely."""
@@ -10,12 +13,15 @@ class MapExecutionError(RuntimeError):
 class UnsupportedExecutionError(MapExecutionError):
     """Raised when a mapped execution path is not implemented."""
 
-
-def execute_map_action(site: str, flow: str, inputs: dict[str, str]) -> dict[str, Any]:
+def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path | None = None) -> dict[str, Any]:
     normalized_site = site.strip().lower()
     normalized_flow = flow.strip()
-    if normalized_site != "github" or normalized_flow != "create_issue":
+    if not _is_supported_execution(normalized_site, normalized_flow):
         raise UnsupportedExecutionError(f"Execution is not supported for {site}:{flow}.")
+    if not load_config(root).maps.allow_execute:
+        raise MapExecutionError(
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable."
+        )
 
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -46,6 +52,10 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str]) -> dict[str
     if "number" in payload:
         result["issue_number"] = payload["number"]
     return result
+
+
+def _is_supported_execution(site: str, flow: str) -> bool:
+    return site == "github" and flow == "create_issue"
 
 
 def _httpx_post(*args: Any, **kwargs: Any) -> Any:

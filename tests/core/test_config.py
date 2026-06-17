@@ -66,6 +66,17 @@ class ConfigTests(unittest.TestCase):
 
             self.assertEqual(config.safety.max_snapshot_mb, 1)
 
+    def test_load_config_reads_allow_execute(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = config_path(root)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+
+            config = load_config(root)
+
+            self.assertTrue(config.maps.allow_execute)
+
 
 if __name__ == "__main__":
     unittest.main()
