@@ -191,7 +191,14 @@ Returned fields:
 
 ## Action maps and dry-run planning
 
-Runewall can load bundled site action maps. Right now the project includes a GitHub example map.
+Runewall can load bundled site action maps without using browser automation.
+
+Currently bundled maps:
+
+- `GitHub`: `create_issue`
+- `Vercel`: `list_projects`
+- `Netlify`: `list_sites`
+- `Cloudflare`: `list_zones`
 
 List bundled maps with:
 
@@ -199,10 +206,15 @@ List bundled maps with:
 runewall maps list
 ```
 
-Inspect the GitHub map with:
+Inspect bundled maps with:
 
 ```bash
 runewall maps show github
+runewall maps show vercel
+runewall maps show netlify
+runewall maps show cloudflare
+runewall maps validate
+runewall maps path
 ```
 
 Plan a mapped action safely with:
@@ -215,7 +227,11 @@ This dry-run does not call GitHub, does not open a browser, and does not mutate 
 
 If Runewall is initialized, the dry-run is logged as `map.dry_run`.
 
-Real map execution is not built yet.
+Only `GitHub create_issue` has real API execution right now.
+
+`Vercel`, `Netlify`, and `Cloudflare` are dry-run and planning maps only for now.
+
+No browser automation is used for these maps.
 
 ## GitHub create issue execution
 
