@@ -156,6 +156,38 @@ Delayed execution currently supports only approved `file.delete`.
 
 Execution snapshots the file before deleting it, and `rollback` can restore the deleted file.
 
+## Universal Read Mode
+
+Runewall can read a normal webpage without browser automation.
+
+It uses `httpx` + `BeautifulSoup`, with:
+
+- no Playwright
+- no LLM
+- no API key
+- no external hosted service
+
+CLI usage:
+
+```bash
+runewall read https://example.com
+```
+
+Python usage:
+
+```python
+from runewall import read_url
+
+content = read_url("https://example.com")
+```
+
+Returned fields:
+
+- `url`
+- `title`
+- `headings`
+- `text`
+
 ## Not built yet
 
 - human approval/reject flow
