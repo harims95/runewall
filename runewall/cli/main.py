@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from runewall.core.db import database_path, initialize_database
+from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
 from runewall.core.rollback import RollbackEngine
 
@@ -23,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     approve_parser.add_argument("action_id")
     reject_parser = subcommands.add_parser("reject", help="Reject a pending action.")
     reject_parser.add_argument("action_id")
+    execute_parser = subcommands.add_parser("execute", help="Execute an approved action.")
+    execute_parser.add_argument("action_id")
     rollback_parser = subcommands.add_parser("rollback", help="Rollback a recorded action.")
     rollback_parser.add_argument("action_id", nargs="?")
     rollback_parser.add_argument("--last", action="store_true")
@@ -132,6 +135,21 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         log.update_action_status(args.action_id, "rejected")
         print(f"Rejected action {args.action_id}.")
+        return 0
+    if args.command == "execute":
+        log = ActionLog.open_existing(root=Path.cwd())
+        if log is None:
+            print(NOT_INITIALIZED_MESSAGE)
+            return 0
+        try:
+            execute_approved_action(args.action_id, root=Path.cwd())
+        except ExecutionError as error:
+            print(str(error))
+            return 1
+        except Exception as error:
+            print(f"Execution failed for action {args.action_id}: {error}")
+            return 1
+        print(f"Executed action {args.action_id}.")
         return 0
     if args.command == "rollback":
         engine = RollbackEngine(root=Path.cwd())

@@ -149,6 +149,7 @@ class ProtectFileWriteTests(unittest.TestCase):
             self.assertIsNotNone(action)
             assert action is not None
             self.assertEqual(action.status, "pending")
+            self.assertEqual(action.params, {"path": "old.txt"})
             self.assertTrue(target.exists())
 
     def test_block_action_raises_and_does_not_log_as_success(self) -> None:

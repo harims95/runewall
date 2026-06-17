@@ -139,6 +139,15 @@ class ActionLog:
             connection.commit()
         return cursor.rowcount > 0
 
+    def update_action_snapshot_id(self, action_id: str, snapshot_id: str) -> bool:
+        with closing(connect(self._db_path)) as connection:
+            cursor = connection.execute(
+                "UPDATE actions SET snapshot_id = ? WHERE id = ?",
+                (snapshot_id, action_id),
+            )
+            connection.commit()
+        return cursor.rowcount > 0
+
     def add_snapshot(self, snapshot: Snapshot) -> Snapshot:
         with closing(connect(self._db_path)) as connection:
             connection.execute(

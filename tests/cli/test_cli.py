@@ -249,6 +249,22 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 1)
             self.assertEqual(output.getvalue().strip(), "Action not found: missing-id")
 
+    def test_execute_non_approved_action_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                action = log.add_action(Action(action_type="file.delete", target="old.txt", status="pending"))
+                with redirect_stdout(output):
+                    exit_code = main(["execute", action.id])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(output.getvalue().strip(), f"Action {action.id} is not approved.")
+
 
 if __name__ == "__main__":
     unittest.main()
