@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 from pathlib import Path
 import sys
@@ -28,7 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="runewall")
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
-    subcommands.add_parser("log", help="Show recorded actions.")
+    log_parser = subcommands.add_parser("log", help="Show recorded actions.")
+    log_parser.add_argument("--json", action="store_true", dest="json_output")
     act_parser = subcommands.add_parser("act", help="Plan a mapped site flow.")
     act_parser.add_argument("site")
     act_parser.add_argument("flow")
@@ -53,7 +55,8 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("pending", help="Show pending actions.")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
     read_parser.add_argument("url")
-    subcommands.add_parser("status", help="Show current Runewall status.")
+    status_parser = subcommands.add_parser("status", help="Show current Runewall status.")
+    status_parser.add_argument("--json", action="store_true", dest="json_output")
     approve_parser = subcommands.add_parser("approve", help="Approve a pending action.")
     approve_parser.add_argument("action_id")
     reject_parser = subcommands.add_parser("reject", help="Reject a pending action.")
@@ -96,6 +99,22 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "log":
         log = ActionLog(root=Path.cwd())
         actions = log.list_actions()
+
+        if args.json_output:
+            print(json.dumps([
+                {
+                    "id": action.id,
+                    "timestamp": action.timestamp,
+                    "action_type": action.action_type,
+                    "target": action.target,
+                    "status": action.status,
+                    "params": action.params,
+                    "result": action.result,
+                }
+                for action in actions
+            ]))
+            return 0
+
         if not actions:
             print(EMPTY_LOG_MESSAGE)
             return 0
@@ -374,6 +393,34 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "status":
         db_path = database_path(Path.cwd())
+
+        if args.json_output:
+            if not db_path.exists():
+                print(json.dumps({"initialized": False, "database_path": str(db_path)}))
+                return 0
+            log = ActionLog.open_existing(root=Path.cwd())
+            if log is None:
+                print(json.dumps({"initialized": False, "database_path": str(db_path)}))
+                return 0
+            latest_action = log.get_last_action()
+            print(json.dumps({
+                "initialized": True,
+                "database_path": str(log.db_path),
+                "total_actions": log.count_actions(),
+                "success_count": log.count_actions_by_status("success"),
+                "failed_count": log.count_actions_by_status("failed"),
+                "rolled_back_count": log.count_actions_by_status("rolled_back"),
+                "pending_count": log.count_actions_by_status("pending"),
+                "latest_action": None if latest_action is None else {
+                    "id": latest_action.id,
+                    "timestamp": latest_action.timestamp,
+                    "action_type": latest_action.action_type,
+                    "target": latest_action.target,
+                    "status": latest_action.status,
+                },
+            }))
+            return 0
+
         if not db_path.exists():
             print(NOT_INITIALIZED_MESSAGE)
             return 0

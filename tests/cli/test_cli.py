@@ -1248,5 +1248,125 @@ class CliTests(unittest.TestCase):
             self.assertIn("Deleted 1 old snapshot(s).", output.getvalue())
 
 
+    def test_status_json_before_init_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["status", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertFalse(data["initialized"])
+            self.assertIn("database_path", data)
+
+    def test_status_json_after_init_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["status", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertTrue(data["initialized"])
+            self.assertIn("total_actions", data)
+            self.assertIn("success_count", data)
+            self.assertIn("failed_count", data)
+            self.assertIn("rolled_back_count", data)
+            self.assertIn("pending_count", data)
+            self.assertIn("latest_action", data)
+
+    def test_log_json_empty_db_prints_empty_array(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["log", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertEqual(data, [])
+
+    def test_log_json_after_action_includes_action_data(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                log.add_action(Action(
+                    action_type="file.write",
+                    target="demo.txt",
+                    status="success",
+                    params={"mode": "overwrite"},
+                    result={"bytes": 42},
+                ))
+                with redirect_stdout(output):
+                    exit_code = main(["log", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertEqual(len(data), 1)
+            entry = data[0]
+            self.assertEqual(entry["action_type"], "file.write")
+            self.assertEqual(entry["target"], "demo.txt")
+            self.assertEqual(entry["status"], "success")
+            self.assertEqual(entry["params"], {"mode": "overwrite"})
+            self.assertEqual(entry["result"], {"bytes": 42})
+            self.assertIn("id", entry)
+            self.assertIn("timestamp", entry)
+
+    def test_normal_status_and_log_output_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code_status = main(["status"])
+                status_out = output.getvalue()
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code_log = main(["log"])
+                log_out = output.getvalue()
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code_status, 0)
+            self.assertIn("Database:", status_out)
+            self.assertIn("Total actions:", status_out)
+            self.assertEqual(exit_code_log, 0)
+            self.assertIn(EMPTY_LOG_MESSAGE, log_out)
+
+
 if __name__ == "__main__":
     unittest.main()
