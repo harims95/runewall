@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import closing
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -44,7 +45,7 @@ class ActionLogTests(unittest.TestCase):
                 {"actions", "snapshots", "rules", "checkpoints"}.issubset(table_names)
             )
 
-    def test_can_save_and_list_action(self) -> None:
+    def test_create_action(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             log = ActionLog(root=root)
@@ -53,19 +54,73 @@ class ActionLogTests(unittest.TestCase):
                 Action(
                     action_type="file.write",
                     target="notes.txt",
-                    params='{"content":"hello"}',
+                    params={"content": "hello"},
                     status="approved",
+                    result={"ok": True},
                 )
             )
 
+            self.assertTrue(database_path(root).exists())
+            self.assertRegex(saved.id, r"^[0-9a-f\-]{36}$")
+            self.assertTrue(saved.timestamp.endswith("Z"))
+
+            with closing(sqlite3.connect(database_path(root))) as connection:
+                row = connection.execute(
+                    "SELECT params, result FROM actions WHERE id = ?",
+                    (saved.id,),
+                ).fetchone()
+
+            self.assertEqual(json.loads(row[0]), {"content": "hello"})
+            self.assertEqual(json.loads(row[1]), {"ok": True})
+
+    def test_get_action_by_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log = ActionLog(root=Path(temp_dir))
+            saved = log.add_action(
+                Action(
+                    action_type="shell.exec",
+                    target="echo hello",
+                    params={"cwd": "."},
+                )
+            )
+
+            loaded = log.get_action(saved.id)
+
+            self.assertIsNotNone(loaded)
+            assert loaded is not None
+            self.assertEqual(loaded.id, saved.id)
+            self.assertEqual(loaded.params, {"cwd": "."})
+
+    def test_list_actions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log = ActionLog(root=Path(temp_dir))
+            first = log.add_action(Action(action_type="file.read", target="a.txt"))
+            second = log.add_action(Action(action_type="file.write", target="b.txt"))
+
             actions = log.list_actions()
 
-            self.assertTrue(database_path(root).exists())
-            self.assertEqual(len(actions), 1)
-            self.assertEqual(actions[0].id, saved.id)
-            self.assertEqual(actions[0].action_type, "file.write")
-            self.assertEqual(actions[0].target, "notes.txt")
-            self.assertEqual(actions[0].status, "approved")
+            self.assertEqual([action.id for action in actions], [first.id, second.id])
+
+    def test_update_action_status(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log = ActionLog(root=Path(temp_dir))
+            saved = log.add_action(Action(action_type="file.delete", target="old.txt"))
+
+            updated = log.update_action_status(saved.id, "approved")
+            loaded = log.get_action(saved.id)
+
+            self.assertTrue(updated)
+            self.assertIsNotNone(loaded)
+            assert loaded is not None
+            self.assertEqual(loaded.status, "approved")
+
+    def test_empty_log_returns_empty_list(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            log = ActionLog(root=Path(temp_dir))
+
+            actions = log.list_actions()
+
+            self.assertEqual(actions, [])
 
 
 if __name__ == "__main__":
