@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 from uuid import uuid4
 
 
@@ -16,6 +16,7 @@ def new_uuid() -> str:
 
 JSONScalar: TypeAlias = str | int | float | bool | None
 JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
+RulePolicy: TypeAlias = Literal["AUTO", "SNAPSHOT", "REVIEW", "BLOCK"]
 
 
 @dataclass(slots=True)
@@ -48,7 +49,7 @@ class Snapshot:
 @dataclass(slots=True)
 class Rule:
     pattern: str
-    policy: str
+    policy: RulePolicy
     id: str = field(default_factory=new_uuid)
     priority: int = 0
 
