@@ -296,6 +296,96 @@ class CliTests(unittest.TestCase):
         self.assertIn("Runewall DB: missing", rendered)
         self.assertIn("Summary: WARN", rendered)
 
+    def test_doctor_shows_config_present_after_init(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Config: present", rendered)
+
+    def test_doctor_shows_config_missing_before_init(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Config: missing", rendered)
+
+    def test_doctor_shows_map_execution_disabled_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Map execution: disabled", rendered)
+
+    def test_doctor_shows_map_execution_enabled_when_config_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "maps.allow_execute", "true"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Map execution: ENABLED", rendered)
+
+    def test_doctor_summary_is_warn_when_map_execution_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "maps.allow_execute", "true"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+            rendered = output.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Map execution: ENABLED", rendered)
+            self.assertIn("Summary: WARN", rendered)
+
     @patch("runewall.cli.main.execute_map_action")
     def test_act_dry_run_for_github_create_issue(self, mocked_execute) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

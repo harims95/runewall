@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import sys
 
-from runewall.core.config import config_path, ensure_config, format_config_data, load_config_data, set_config_value
+from runewall.core.config import config_path, ensure_config, format_config_data, load_config, load_config_data, set_config_value
 from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
@@ -276,17 +276,21 @@ def main(argv: list[str] | None = None) -> int:
         bs4_available = importlib.util.find_spec("bs4") is not None
         github_token_set = bool(os.environ.get("GITHUB_TOKEN"))
         maps_count = len(SiteMapRegistry().list_maps())
+        config_exists = config_path(Path.cwd()).exists()
+        allow_execute = load_config(Path.cwd()).maps.allow_execute
 
         print(f"Python: {sys.version.split()[0]}")
         print(f"Runewall DB: {'present' if db_exists else 'missing'}")
+        print(f"Config: {'present' if config_exists else 'missing'}")
         print(f"Dependency httpx: {'OK' if httpx_available else 'MISSING'}")
         print(f"Dependency bs4: {'OK' if bs4_available else 'MISSING'}")
         print(f"GITHUB_TOKEN: {'set' if github_token_set else 'missing'}")
         print(f"Bundled maps: {maps_count}")
+        print(f"Map execution: {'ENABLED' if allow_execute else 'disabled'}")
 
         if not httpx_available or not bs4_available:
             print("Summary: FAIL")
-        elif not db_exists or not github_token_set:
+        elif not db_exists or not github_token_set or allow_execute:
             print("Summary: WARN")
         else:
             print("Summary: OK")
