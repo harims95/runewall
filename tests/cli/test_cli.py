@@ -90,7 +90,8 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
 
-    def test_act_dry_run_for_github_create_issue(self) -> None:
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_dry_run_for_github_create_issue(self, mocked_execute) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
             output = io.StringIO()
@@ -125,6 +126,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("- title=Bug report", rendered)
         self.assertIn("Missing inputs: none", rendered)
         self.assertIn("Runewall is not initialized; dry run was not logged.", rendered)
+        mocked_execute.assert_not_called()
 
     def test_act_dry_run_missing_required_input_fails_clearly(self) -> None:
         output = io.StringIO()
@@ -239,6 +241,128 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Flow not found for GitHub: unknown_flow")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_act_execute_missing_token_fails_clearly(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(
+                [
+                    "act",
+                    "github",
+                    "create_issue",
+                    "--execute",
+                    "--input",
+                    "repo=user/repo",
+                    "--input",
+                    "title=Bug report",
+                ]
+            )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(output.getvalue().strip(), "GITHUB_TOKEN is required to execute github:create_issue.")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_act_execute_missing_token_logs_failed_if_initialized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--execute",
+                            "--input",
+                            "repo=user/repo",
+                            "--input",
+                            "title=Bug report",
+                        ]
+                    )
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual(action.action_type, "map.execute")
+        self.assertEqual(action.status, "failed")
+        self.assertEqual(action.result, {"error": "GITHUB_TOKEN is required to execute github:create_issue."})
+        self.assertNotIn("GITHUB_TOKEN", str(action.params))
+
+    @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-token"}, clear=True)
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_execute_success_logs_map_execute_without_token(self, mocked_execute) -> None:
+        mocked_execute.return_value = {
+            "issue_url": "https://github.com/user/repo/issues/1",
+            "issue_number": 1,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(
+                        [
+                            "act",
+                            "github",
+                            "create_issue",
+                            "--execute",
+                            "--input",
+                            "repo=user/repo",
+                            "--input",
+                            "title=Bug report",
+                            "--input",
+                            "body=Details",
+                        ]
+                    )
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual(action.action_type, "map.execute")
+        self.assertEqual(action.status, "success")
+        self.assertEqual(
+            action.result,
+            {"issue_url": "https://github.com/user/repo/issues/1", "issue_number": 1},
+        )
+        self.assertNotIn("secret-token", str(action.params))
+        self.assertNotIn("secret-token", str(action.result))
+        self.assertIn("Created GitHub issue for user/repo.", output.getvalue())
+
+    @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-token"}, clear=True)
+    def test_act_execute_unsupported_site_flow_fails_clearly(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(
+                [
+                    "act",
+                    "github",
+                    "delete_repository",
+                    "--execute",
+                    "--input",
+                    "repo=user/repo",
+                ]
+            )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(output.getvalue().strip(), "Flow not found for GitHub: delete_repository")
 
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

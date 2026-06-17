@@ -6,6 +6,7 @@ from pathlib import Path
 from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
+from runewall.maps.executor import MapExecutionError, UnsupportedExecutionError, execute_map_action
 from runewall.maps import SiteMapRegistry
 from runewall.maps.planner import DryRunPlanner, dry_run_result, missing_inputs_error, render_plan
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
@@ -27,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     act_parser.add_argument("site")
     act_parser.add_argument("flow")
     act_parser.add_argument("--dry-run", action="store_true")
+    act_parser.add_argument("--execute", action="store_true")
     act_parser.add_argument("--input", action="append", default=[])
     maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
@@ -79,8 +81,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
     if args.command == "act":
-        if not args.dry_run:
-            print("Only --dry-run is supported right now.")
+        if not args.dry_run and not args.execute:
+            print("Choose --dry-run or --execute.")
+            return 1
+        if args.dry_run and args.execute:
+            print("Choose only one of --dry-run or --execute.")
             return 1
 
         log = ActionLog.open_existing(root=Path.cwd())
@@ -102,13 +107,14 @@ def main(argv: list[str] | None = None) -> int:
             print(str(error))
             return 1
 
-        print(render_plan(plan))
         validation_error = missing_inputs_error(plan)
+        if args.dry_run:
+            print(render_plan(plan))
         if validation_error is not None:
             if log is not None:
                 log.add_action(
                     Action(
-                        action_type="map.dry_run",
+                        action_type="map.dry_run" if args.dry_run else "map.execute",
                         target=f"{args.site}:{args.flow}",
                         status="failed",
                         params={"site": args.site, "flow": args.flow, "inputs": inputs},
@@ -119,19 +125,58 @@ def main(argv: list[str] | None = None) -> int:
             print(validation_error)
             return 1
 
+        if args.dry_run:
+            if log is not None:
+                log.add_action(
+                    Action(
+                        action_type="map.dry_run",
+                        target=f"{args.site}:{args.flow}",
+                        status="success",
+                        params={"site": args.site, "flow": args.flow, "inputs": inputs},
+                        result=dry_run_result(plan),
+                        reversible=False,
+                    )
+                )
+            else:
+                print("Runewall is not initialized; dry run was not logged.")
+            return 0
+
+        try:
+            result = execute_map_action(args.site, args.flow, inputs)
+        except (MapExecutionError, UnsupportedExecutionError) as error:
+            if log is not None:
+                log.add_action(
+                    Action(
+                        action_type="map.execute",
+                        target=f"{args.site}:{args.flow}",
+                        status="failed",
+                        params={"site": args.site, "flow": args.flow, "inputs": inputs},
+                        result={"error": str(error)},
+                        reversible=False,
+                    )
+                )
+            print(str(error))
+            return 1
+
         if log is not None:
             log.add_action(
                 Action(
-                    action_type="map.dry_run",
+                    action_type="map.execute",
                     target=f"{args.site}:{args.flow}",
                     status="success",
                     params={"site": args.site, "flow": args.flow, "inputs": inputs},
-                    result=dry_run_result(plan),
+                    result=result,
                     reversible=False,
                 )
             )
         else:
-            print("Runewall is not initialized; dry run was not logged.")
+            print("Runewall is not initialized; execution was not logged.")
+
+        print(f"Created GitHub issue for {inputs['repo']}.")
+        if "issue_number" in result:
+            print(f"Issue number: {result['issue_number']}")
+        if "issue_url" in result:
+            print(f"Issue URL: {result['issue_url']}")
         return 0
     if args.command == "maps":
         registry = SiteMapRegistry()
