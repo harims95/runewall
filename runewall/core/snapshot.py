@@ -47,6 +47,17 @@ class SnapshotEngine:
         self._write_meta(snapshot_dir / "meta.json", snapshot, action)
         return snapshot
 
+    def target_path_for_snapshot(self, snapshot: Snapshot) -> Path:
+        return self._resolve_target(snapshot.target)
+
+    def copied_file_path(self, snapshot: Snapshot) -> Path:
+        snapshot_dir = Path(snapshot.storage_path)
+        return snapshot_dir / "files" / self._relative_target(self.target_path_for_snapshot(snapshot))
+
+    @staticmethod
+    def meta_path(snapshot: Snapshot) -> Path:
+        return Path(snapshot.storage_path) / "meta.json"
+
     def _snapshot_dir(self, snapshot_id: str) -> Path:
         return project_state_dir(self._root) / "snapshots" / snapshot_id
 

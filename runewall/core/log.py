@@ -63,6 +63,21 @@ class ActionLog:
             return None
         return self._row_to_action(row)
 
+    def get_last_action(self) -> Action | None:
+        with closing(connect(self._db_path)) as connection:
+            row = connection.execute(
+                """
+                SELECT id, timestamp, agent_id, action_type, target, params, risk_level,
+                       status, rule_applied, snapshot_id, result, reversible, reasoning
+                FROM actions
+                ORDER BY timestamp DESC, id DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_action(row)
+
     def list_actions(self, limit: int = 50) -> list[Action]:
         with closing(connect(self._db_path)) as connection:
             rows = connection.execute(
@@ -105,6 +120,22 @@ class ActionLog:
             connection.commit()
         return snapshot
 
+    def get_latest_snapshot_for_action(self, action_id: str) -> Snapshot | None:
+        with closing(connect(self._db_path)) as connection:
+            row = connection.execute(
+                """
+                SELECT id, action_id, type, target, storage_path, size_bytes
+                FROM snapshots
+                WHERE action_id = ?
+                ORDER BY rowid DESC
+                LIMIT 1
+                """,
+                (action_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_snapshot(row)
+
     @staticmethod
     def _row_to_action(row: sqlite3.Row) -> Action:
         return Action(
@@ -121,6 +152,17 @@ class ActionLog:
             result=ActionLog._load_json(row["result"]),
             reversible=bool(row["reversible"]),
             reasoning=row["reasoning"],
+        )
+
+    @staticmethod
+    def _row_to_snapshot(row: sqlite3.Row) -> Snapshot:
+        return Snapshot(
+            id=row["id"],
+            action_id=row["action_id"],
+            type=row["type"],
+            target=row["target"],
+            storage_path=row["storage_path"],
+            size_bytes=row["size_bytes"],
         )
 
     @staticmethod
