@@ -65,6 +65,17 @@ class SiteMapRegistryTests(unittest.TestCase):
 
         self.assertEqual(str(context.exception), "Flow not found for GitHub: unknown_flow")
 
+    def test_validate_bundled_maps_passes_with_github(self) -> None:
+        registry = SiteMapRegistry()
+
+        results = registry.validate_bundled_maps()
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].site_key, "github")
+        self.assertEqual(results[0].site_name, "GitHub")
+        self.assertTrue(results[0].ok)
+        self.assertIsNone(results[0].error)
+
 
 if __name__ == "__main__":
     unittest.main()

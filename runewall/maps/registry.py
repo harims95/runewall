@@ -29,6 +29,14 @@ class SiteMap:
     raw: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class MapValidationResult:
+    site_key: str
+    site_name: str | None
+    ok: bool
+    error: str | None = None
+
+
 class SiteMapRegistry:
     """Loads bundled JSON site maps from runewall.maps.sites."""
 
@@ -39,6 +47,34 @@ class SiteMapRegistry:
             if entry.is_file() and entry.name.endswith(".json"):
                 maps.append(self.load_map(entry.name))
         return maps
+
+    def validate_bundled_maps(self) -> list[MapValidationResult]:
+        results: list[MapValidationResult] = []
+        sites_root = resources.files("runewall.maps").joinpath("sites")
+        for entry in sorted(sites_root.iterdir(), key=lambda item: item.name):
+            if not entry.is_file() or not entry.name.endswith(".json"):
+                continue
+            site_key = entry.name.removesuffix(".json")
+            try:
+                site_map = self.load_map(entry.name)
+            except MapValidationError as error:
+                results.append(
+                    MapValidationResult(
+                        site_key=site_key,
+                        site_name=None,
+                        ok=False,
+                        error=str(error),
+                    )
+                )
+                continue
+            results.append(
+                MapValidationResult(
+                    site_key=site_key,
+                    site_name=site_map.site_name,
+                    ok=True,
+                )
+            )
+        return results
 
     def load_site(self, site_key: str) -> SiteMap | None:
         normalized_key = site_key.strip().lower()

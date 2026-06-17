@@ -36,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
     maps_subcommands.add_parser("list", help="List bundled site maps.")
+    maps_subcommands.add_parser("validate", help="Validate bundled site maps.")
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
     subcommands.add_parser("doctor", help="Check local Runewall health.")
@@ -202,6 +203,17 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
             return 0
+        if args.maps_command == "validate":
+            results = registry.validate_bundled_maps()
+            all_valid = True
+            for result in results:
+                label = result.site_name or result.site_key
+                if result.ok:
+                    print(f"{result.site_key} ({label})\tOK")
+                else:
+                    all_valid = False
+                    print(f"{result.site_key} ({label})\tFAIL\t{result.error}")
+            return 0 if all_valid else 1
         if args.maps_command == "show":
             site_map = registry.load_site(args.site)
             if site_map is None:

@@ -90,6 +90,16 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
 
+    def test_maps_validate_prints_ok_for_github(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate"])
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("github (GitHub)\tOK", rendered)
+
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
     def test_doctor_prints_dependency_checks(self, mocked_find_spec) -> None:
