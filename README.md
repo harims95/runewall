@@ -188,6 +188,34 @@ Returned fields:
 - `headings`
 - `text`
 
+## Action maps and dry-run planning
+
+Runewall can load bundled site action maps. Right now the project includes a GitHub example map.
+
+List bundled maps with:
+
+```bash
+runewall maps list
+```
+
+Inspect the GitHub map with:
+
+```bash
+runewall maps show github
+```
+
+Plan a mapped action safely with:
+
+```bash
+runewall act github create_issue --dry-run --input repo=user/repo --input title="Bug report" --input body="Details"
+```
+
+This dry-run does not call GitHub, does not open a browser, and does not mutate anything.
+
+If Runewall is initialized, the dry-run is logged as `map.dry_run`.
+
+Real map execution is not built yet.
+
 ## Not built yet
 
 - human approval/reject flow
