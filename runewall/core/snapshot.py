@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import shutil
 
+from .config import load_config
 from .db import project_state_dir
 from .models import Action, Snapshot
 
@@ -13,9 +14,18 @@ DEFAULT_MAX_FILE_SNAPSHOT_SIZE = 500 * 1024 * 1024
 class SnapshotEngine:
     """Create reversible file snapshots for core file actions."""
 
-    def __init__(self, root: Path | None = None, max_file_size_bytes: int = DEFAULT_MAX_FILE_SNAPSHOT_SIZE) -> None:
+    def __init__(
+        self,
+        root: Path | None = None,
+        max_file_size_bytes: int | None = None,
+        max_snapshot_mb: int | None = None,
+    ) -> None:
         self._root = (root or Path.cwd()).resolve()
-        self._max_file_size_bytes = max_file_size_bytes
+        self._max_file_size_bytes = self._resolve_max_file_size_bytes(
+            self._root,
+            max_file_size_bytes=max_file_size_bytes,
+            max_snapshot_mb=max_snapshot_mb,
+        )
 
     def create_snapshot(self, action: Action) -> Snapshot:
         target_path = self._resolve_target(action.target)
@@ -91,6 +101,19 @@ class SnapshotEngine:
             raise ValueError(
                 f"File is too large to snapshot ({size_bytes} bytes > {self._max_file_size_bytes} bytes): {path}"
             )
+
+    @staticmethod
+    def _resolve_max_file_size_bytes(
+        root: Path,
+        *,
+        max_file_size_bytes: int | None,
+        max_snapshot_mb: int | None,
+    ) -> int:
+        if max_file_size_bytes is not None:
+            return max_file_size_bytes
+        if max_snapshot_mb is not None:
+            return max_snapshot_mb * 1024 * 1024
+        return load_config(root).safety.max_snapshot_mb * 1024 * 1024
 
     @staticmethod
     def _write_meta(meta_path: Path, snapshot: Snapshot, action: Action) -> None:

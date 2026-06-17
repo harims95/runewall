@@ -55,6 +55,17 @@ class ConfigTests(unittest.TestCase):
             self.assertFalse(config.maps.allow_execute)
             self.assertEqual(config.auth.github_token_env, "GITHUB_TOKEN")
 
+    def test_load_config_reads_custom_snapshot_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = config_path(root)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("[safety]\nmax_snapshot_mb = 1\n", encoding="utf-8")
+
+            config = load_config(root)
+
+            self.assertEqual(config.safety.max_snapshot_mb, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

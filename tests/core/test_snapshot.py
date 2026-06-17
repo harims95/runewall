@@ -16,6 +16,40 @@ from runewall.core.snapshot import SnapshotEngine
 
 
 class SnapshotEngineTests(unittest.TestCase):
+    def test_default_limit_remains_500mb(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            engine = SnapshotEngine(root=Path(temp_dir))
+
+            self.assertEqual(engine._max_file_size_bytes, 500 * 1024 * 1024)
+
+    def test_config_value_overrides_default_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_dir = root / ".runewall"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "config.toml").write_text(
+                "[safety]\nmax_snapshot_mb = 1\n",
+                encoding="utf-8",
+            )
+
+            engine = SnapshotEngine(root=root)
+
+            self.assertEqual(engine._max_file_size_bytes, 1 * 1024 * 1024)
+
+    def test_explicit_max_snapshot_mb_overrides_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_dir = root / ".runewall"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "config.toml").write_text(
+                "[safety]\nmax_snapshot_mb = 1\n",
+                encoding="utf-8",
+            )
+
+            engine = SnapshotEngine(root=root, max_snapshot_mb=2)
+
+            self.assertEqual(engine._max_file_size_bytes, 2 * 1024 * 1024)
+
     def test_file_write_snapshots_old_file_content(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -79,6 +113,22 @@ class SnapshotEngineTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "File is too large to snapshot"):
                 engine.create_snapshot(Action(action_type="file.write", target="large.bin"))
+
+    def test_oversized_file_uses_configured_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_dir = root / ".runewall"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "config.toml").write_text(
+                "[safety]\nmax_snapshot_mb = 1\n",
+                encoding="utf-8",
+            )
+            target = root / "too-large.bin"
+            target.write_bytes(b"x" * (1024 * 1024 + 1))
+            engine = SnapshotEngine(root=root)
+
+            with self.assertRaisesRegex(ValueError, "File is too large to snapshot"):
+                engine.create_snapshot(Action(action_type="file.write", target="too-large.bin"))
 
 
 if __name__ == "__main__":
