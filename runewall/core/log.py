@@ -20,6 +20,18 @@ class ActionLog:
     def db_path(self) -> Path:
         return self._db_path
 
+    @classmethod
+    def open_existing(cls, root: Path | None = None) -> ActionLog | None:
+        candidate_root = root or Path.cwd()
+        candidate_db_path = candidate_root / ".runewall" / "runewall.db"
+        if not candidate_db_path.exists():
+            return None
+
+        instance = cls.__new__(cls)
+        instance._root = root
+        instance._db_path = candidate_db_path
+        return instance
+
     def add_action(self, action: Action) -> Action:
         with closing(connect(self._db_path)) as connection:
             connection.execute(
@@ -77,6 +89,19 @@ class ActionLog:
         if row is None:
             return None
         return self._row_to_action(row)
+
+    def count_actions(self) -> int:
+        with closing(connect(self._db_path)) as connection:
+            row = connection.execute("SELECT COUNT(*) AS count FROM actions").fetchone()
+        return int(row["count"])
+
+    def count_actions_by_status(self, status: str) -> int:
+        with closing(connect(self._db_path)) as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS count FROM actions WHERE status = ?",
+                (status,),
+            ).fetchone()
+        return int(row["count"])
 
     def list_actions(self, limit: int = 50) -> list[Action]:
         with closing(connect(self._db_path)) as connection:
