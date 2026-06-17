@@ -34,6 +34,7 @@ type demo.txt
 - `runewall init`
 - `runewall log`
 - `runewall status`
+- `runewall doctor`
 - `runewall rollback --last`
 - `protect_file_create`
 - `protect_file_write`
@@ -241,6 +242,19 @@ runewall act github create_issue --execute --input repo=user/repo --input title=
 Tests use mocks.
 
 Do not use a real token unless you intentionally want to create a real GitHub issue.
+
+## Doctor
+
+`runewall doctor` prints a simple local health check.
+
+It checks:
+
+- Python version
+- whether `.runewall/runewall.db` exists
+- whether required dependencies like `httpx` and `bs4` are installed
+- whether `GITHUB_TOKEN` is set without printing the token value
+- bundled maps count
+- a final `OK`, `WARN`, or `FAIL` summary
 
 ## Not built yet
 
