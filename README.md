@@ -29,6 +29,16 @@ runewall rollback --last
 type demo.txt
 ```
 
+## Current working features
+
+- `runewall init`
+- `runewall log`
+- `runewall status`
+- `runewall rollback --last`
+- `protect_file_create`
+- `protect_file_write`
+- `protect_file_delete`
+
 ## Current working demo
 
 1. Initialize Runewall:
@@ -72,3 +82,49 @@ type demo.txt
 ```
 
 In simple terms, Runewall snapshots the file before mutation, logs the action, marks it as `success` if the write completes, and `rollback` restores the original content.
+
+## Simple example
+
+1. Initialize Runewall:
+
+```bash
+runewall init
+```
+
+2. Create the original file:
+
+```bash
+echo "original content" > demo.txt
+```
+
+3. Change it with `protect_file_write`:
+
+```python
+from pathlib import Path
+from runewall import protect_file_write
+
+with protect_file_write("demo.txt"):
+    Path("demo.txt").write_text("changed by interceptor")
+```
+
+4. Show the logged action:
+
+```bash
+runewall log
+```
+
+5. Restore the file:
+
+```bash
+runewall rollback --last
+type demo.txt
+```
+
+## Not built yet
+
+- human approval/reject flow
+- browser/web translation
+- website maps
+- auth
+- dashboard
+- TypeScript SDK
