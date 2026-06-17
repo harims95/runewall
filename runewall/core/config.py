@@ -55,6 +55,15 @@ class RunewallConfig:
         return asdict(self)
 
 
+KNOWN_CONFIG_KEYS: dict[str, type] = {
+    "safety.default_policy": str,
+    "safety.max_snapshot_mb": int,
+    "retention.snapshot_days": int,
+    "maps.allow_execute": bool,
+    "auth.github_token_env": str,
+}
+
+
 def config_path(root: Path | None = None) -> Path:
     return project_state_dir(root) / "config.toml"
 
@@ -65,6 +74,41 @@ def ensure_config(root: Path | None = None) -> Path:
     if not path.exists():
         path.write_text(DEFAULT_CONFIG_TEXT, encoding="utf-8")
     return path
+
+
+def set_config_value(key: str, raw_value: str, root: Path | None = None) -> None:
+    if key not in KNOWN_CONFIG_KEYS:
+        raise ValueError(
+            f"Unknown config key: {key}. Known keys: {', '.join(sorted(KNOWN_CONFIG_KEYS))}"
+        )
+
+    expected_type = KNOWN_CONFIG_KEYS[key]
+    parsed: Any
+
+    if expected_type is bool:
+        if raw_value.lower() == "true":
+            parsed = True
+        elif raw_value.lower() == "false":
+            parsed = False
+        else:
+            raise ValueError(
+                f"Invalid boolean for {key}: {raw_value!r}. Use true or false."
+            )
+    elif expected_type is int:
+        try:
+            parsed = int(raw_value)
+        except ValueError:
+            raise ValueError(f"Invalid integer for {key}: {raw_value!r}.")
+    else:
+        parsed = raw_value
+
+    ensure_config(root)
+    data = load_config_data(root)
+    section, field = key.split(".", 1)
+    if section not in data or not isinstance(data[section], dict):
+        data[section] = {}
+    data[section][field] = parsed
+    config_path(root).write_text(_format_config_for_file(data) + "\n", encoding="utf-8")
 
 
 def load_config(root: Path | None = None) -> RunewallConfig:
@@ -155,6 +199,16 @@ def _as_int(value: Any, default: int) -> int:
 
 def _as_bool(value: Any, default: bool) -> bool:
     return value if isinstance(value, bool) else default
+
+
+def _format_config_for_file(data: dict[str, dict[str, Any]]) -> str:
+    lines: list[str] = []
+    for section_name, section_values in data.items():
+        lines.append(f"[{section_name}]")
+        for field_key, value in section_values.items():
+            lines.append(f"{field_key} = {_format_toml_value(value)}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
 
 def _redact_mapping(data: dict[str, Any]) -> dict[str, Any]:

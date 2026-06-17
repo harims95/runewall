@@ -991,6 +991,103 @@ class CliTests(unittest.TestCase):
             self.assertEqual(action.result, {"title": "Example Page", "heading_count": 1, "text_length": 26})
             self.assertNotIn("Runewall is not initialized; read action was not logged.", output.getvalue())
 
+    def test_config_set_maps_allow_execute_true(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.allow_execute", "true"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(output.getvalue().strip(), "Updated config: maps.allow_execute = true")
+            from runewall.core.config import load_config
+            self.assertTrue(load_config(Path(temp_dir)).maps.allow_execute)
+
+    def test_config_set_safety_max_snapshot_mb(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "safety.max_snapshot_mb", "100"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(output.getvalue().strip(), "Updated config: safety.max_snapshot_mb = 100")
+            from runewall.core.config import load_config
+            self.assertEqual(load_config(Path(temp_dir)).safety.max_snapshot_mb, 100)
+
+    def test_config_set_creates_config_if_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.allow_execute", "true"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((Path(temp_dir) / ".runewall" / "config.toml").exists())
+            from runewall.core.config import load_config
+            self.assertTrue(load_config(Path(temp_dir)).maps.allow_execute)
+
+    def test_config_set_unknown_key_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.unknown_key", "true"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Unknown config key: maps.unknown_key", output.getvalue())
+
+    def test_config_set_invalid_boolean_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.allow_execute", "yes"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Invalid boolean for maps.allow_execute", output.getvalue())
+        self.assertIn("Use true or false", output.getvalue())
+
+    def test_config_set_invalid_integer_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "safety.max_snapshot_mb", "abc"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Invalid integer for safety.max_snapshot_mb", output.getvalue())
+
     @patch("runewall.cli.main.read_url", side_effect=RuntimeError("network down"))
     def test_failed_read_logs_failed_if_db_exists(self, mocked_read) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

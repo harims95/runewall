@@ -11,7 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.cli.main import main
-from runewall.core.config import config_path, load_config
+from runewall.core.config import config_path, load_config, set_config_value
 
 
 class ConfigTests(unittest.TestCase):
@@ -76,6 +76,54 @@ class ConfigTests(unittest.TestCase):
             config = load_config(root)
 
             self.assertTrue(config.maps.allow_execute)
+
+
+class ConfigSetTests(unittest.TestCase):
+    def test_set_maps_allow_execute_true_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("maps.allow_execute", "true", root=root)
+            self.assertTrue(load_config(root).maps.allow_execute)
+
+    def test_set_maps_allow_execute_false_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("maps.allow_execute", "true", root=root)
+            set_config_value("maps.allow_execute", "false", root=root)
+            self.assertFalse(load_config(root).maps.allow_execute)
+
+    def test_set_safety_max_snapshot_mb_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("safety.max_snapshot_mb", "100", root=root)
+            self.assertEqual(load_config(root).safety.max_snapshot_mb, 100)
+
+    def test_set_creates_config_if_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.assertFalse(config_path(root).exists())
+            set_config_value("maps.allow_execute", "true", root=root)
+            self.assertTrue(config_path(root).exists())
+            self.assertTrue(load_config(root).maps.allow_execute)
+
+    def test_set_unknown_key_raises_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(ValueError) as context:
+                set_config_value("maps.unknown_key", "true", root=Path(temp_dir))
+        self.assertIn("Unknown config key: maps.unknown_key", str(context.exception))
+
+    def test_set_invalid_boolean_raises_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(ValueError) as context:
+                set_config_value("maps.allow_execute", "yes", root=Path(temp_dir))
+        self.assertIn("Invalid boolean for maps.allow_execute", str(context.exception))
+        self.assertIn("Use true or false", str(context.exception))
+
+    def test_set_invalid_integer_raises_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(ValueError) as context:
+                set_config_value("safety.max_snapshot_mb", "abc", root=Path(temp_dir))
+        self.assertIn("Invalid integer for safety.max_snapshot_mb", str(context.exception))
 
 
 if __name__ == "__main__":

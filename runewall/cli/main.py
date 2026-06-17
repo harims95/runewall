@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import sys
 
-from runewall.core.config import config_path, ensure_config, format_config_data, load_config_data
+from runewall.core.config import config_path, ensure_config, format_config_data, load_config_data, set_config_value
 from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
@@ -45,6 +45,9 @@ def build_parser() -> argparse.ArgumentParser:
     config_subcommands = config_parser.add_subparsers(dest="config_command", required=True)
     config_subcommands.add_parser("path", help="Show the local config path.")
     config_subcommands.add_parser("show", help="Show the local config.")
+    config_set_parser = config_subcommands.add_parser("set", help="Set a config value.")
+    config_set_parser.add_argument("key")
+    config_set_parser.add_argument("value")
     subcommands.add_parser("doctor", help="Check local Runewall health.")
     subcommands.add_parser("pending", help="Show pending actions.")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
@@ -77,6 +80,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.config_command == "show":
             print(format_config_data(load_config_data(Path.cwd())))
+            return 0
+        if args.config_command == "set":
+            try:
+                set_config_value(args.key, args.value, root=Path.cwd())
+            except ValueError as error:
+                print(str(error))
+                return 1
+            print(f"Updated config: {args.key} = {args.value}")
             return 0
     if args.command == "log":
         log = ActionLog(root=Path.cwd())

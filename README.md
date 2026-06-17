@@ -266,6 +266,16 @@ Print the current config (secret-like values are redacted):
 runewall config show
 ```
 
+Set a config value:
+
+```bash
+runewall config set maps.allow_execute true
+runewall config set safety.max_snapshot_mb 100
+runewall config set auth.github_token_env GITHUB_TOKEN
+```
+
+If the config file does not exist yet, `config set` creates it first. Unknown keys are rejected with a clear error.
+
 The config is local-first. It is never uploaded or sent anywhere.
 
 **Dry-run map planning works by default.** No config changes are needed.
