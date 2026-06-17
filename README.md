@@ -136,13 +136,25 @@ Users can approve an action with:
 runewall approve ID
 ```
 
+`approve ID` changes a pending action to `approved`.
+
+Users can execute an approved action with:
+
+```bash
+runewall execute ID
+```
+
+`execute ID` runs an approved action if it is supported.
+
 Users can reject an action with:
 
 ```bash
 runewall reject ID
 ```
 
-Approval currently changes status only. Delayed execution after approval is not built yet.
+Delayed execution currently supports only approved `file.delete`.
+
+Execution snapshots the file before deleting it, and `rollback` can restore the deleted file.
 
 ## Not built yet
 
