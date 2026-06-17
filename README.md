@@ -19,3 +19,12 @@ pip install -e .[dev]
 runewall init
 pytest tests -v
 ```
+
+## Manual Demo
+
+```bash
+python examples/file_rollback_demo.py
+type demo.txt
+runewall rollback --last
+type demo.txt
+```
