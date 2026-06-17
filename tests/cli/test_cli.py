@@ -90,6 +90,65 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
 
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_prints_dependency_checks(self, mocked_find_spec) -> None:
+        def fake_find_spec(name: str) -> object | None:
+            if name in {"httpx", "bs4"}:
+                return object()
+            return None
+
+        mocked_find_spec.side_effect = fake_find_spec
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Dependency httpx: OK", rendered)
+        self.assertIn("Dependency bs4: OK", rendered)
+        self.assertIn("Bundled maps:", rendered)
+        self.assertIn("Summary: WARN", rendered)
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"GITHUB_TOKEN": "super-secret-token"}, clear=True)
+    def test_doctor_does_not_print_token_value(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["doctor"])
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("GITHUB_TOKEN: set", rendered)
+        self.assertNotIn("super-secret-token", rendered)
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_handles_missing_runewall_cleanly(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Runewall DB: missing", rendered)
+        self.assertIn("Summary: WARN", rendered)
+
     @patch("runewall.cli.main.execute_map_action")
     def test_act_dry_run_for_github_create_issue(self, mocked_execute) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

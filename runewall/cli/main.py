@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
+import os
 from pathlib import Path
+import sys
 
 from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
@@ -35,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     maps_subcommands.add_parser("list", help="List bundled site maps.")
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
+    subcommands.add_parser("doctor", help="Check local Runewall health.")
     subcommands.add_parser("pending", help="Show pending actions.")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
     read_parser.add_argument("url")
@@ -222,6 +226,27 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  requires_auth: {flow_data.get('requires_auth', False)}")
                 print(f"  required inputs: {', '.join(required_inputs) if required_inputs else 'none'}")
             return 0
+    if args.command == "doctor":
+        db_exists = database_path(Path.cwd()).exists()
+        httpx_available = importlib.util.find_spec("httpx") is not None
+        bs4_available = importlib.util.find_spec("bs4") is not None
+        github_token_set = bool(os.environ.get("GITHUB_TOKEN"))
+        maps_count = len(SiteMapRegistry().list_maps())
+
+        print(f"Python: {sys.version.split()[0]}")
+        print(f"Runewall DB: {'present' if db_exists else 'missing'}")
+        print(f"Dependency httpx: {'OK' if httpx_available else 'MISSING'}")
+        print(f"Dependency bs4: {'OK' if bs4_available else 'MISSING'}")
+        print(f"GITHUB_TOKEN: {'set' if github_token_set else 'missing'}")
+        print(f"Bundled maps: {maps_count}")
+
+        if not httpx_available or not bs4_available:
+            print("Summary: FAIL")
+        elif not db_exists or not github_token_set:
+            print("Summary: WARN")
+        else:
+            print("Summary: OK")
+        return 0
     if args.command == "pending":
         log = ActionLog.open_existing(root=Path.cwd())
         if log is None:
