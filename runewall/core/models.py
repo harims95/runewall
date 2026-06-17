@@ -43,6 +43,8 @@ class Snapshot:
     target: str
     storage_path: str
     size_bytes: int | None = None
+    reversible: bool = True
+    timestamp: str = field(default_factory=utc_now_iso)
     id: str = field(default_factory=new_uuid)
 
 

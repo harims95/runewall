@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from .db import connect, initialize_database
-from .models import Action
+from .models import Action, Snapshot
 
 
 class ActionLog:
@@ -85,6 +85,25 @@ class ActionLog:
             )
             connection.commit()
         return cursor.rowcount > 0
+
+    def add_snapshot(self, snapshot: Snapshot) -> Snapshot:
+        with closing(connect(self._db_path)) as connection:
+            connection.execute(
+                """
+                INSERT INTO snapshots (id, action_id, type, target, storage_path, size_bytes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    snapshot.id,
+                    snapshot.action_id,
+                    snapshot.type,
+                    snapshot.target,
+                    snapshot.storage_path,
+                    snapshot.size_bytes,
+                ),
+            )
+            connection.commit()
+        return snapshot
 
     @staticmethod
     def _row_to_action(row: sqlite3.Row) -> Action:
