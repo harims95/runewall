@@ -52,7 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
     config_set_parser.add_argument("key")
     config_set_parser.add_argument("value")
     subcommands.add_parser("doctor", help="Check local Runewall health.")
-    subcommands.add_parser("pending", help="Show pending actions.")
+    pending_parser = subcommands.add_parser("pending", help="Show pending actions.")
+    pending_parser.add_argument("--json", action="store_true", dest="json_output")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
     read_parser.add_argument("url")
     status_parser = subcommands.add_parser("status", help="Show current Runewall status.")
@@ -320,6 +321,29 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "pending":
         log = ActionLog.open_existing(root=Path.cwd())
+
+        if args.json_output:
+            if log is None:
+                print(json.dumps({"initialized": False, "pending": []}))
+                return 0
+            actions = log.list_pending_actions()
+            print(json.dumps({
+                "initialized": True,
+                "pending": [
+                    {
+                        "id": action.id,
+                        "timestamp": action.timestamp,
+                        "action_type": action.action_type,
+                        "target": action.target,
+                        "status": action.status,
+                        "params": action.params,
+                        "result": action.result,
+                    }
+                    for action in actions
+                ],
+            }))
+            return 0
+
         if log is None:
             print(NOT_INITIALIZED_MESSAGE)
             return 0

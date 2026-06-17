@@ -1368,5 +1368,97 @@ class CliTests(unittest.TestCase):
             self.assertIn(EMPTY_LOG_MESSAGE, log_out)
 
 
+    def test_pending_json_before_init_prints_initialized_false(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["pending", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertFalse(data["initialized"])
+            self.assertEqual(data["pending"], [])
+
+    def test_pending_json_after_init_with_no_pending_actions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["pending", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertTrue(data["initialized"])
+            self.assertEqual(data["pending"], [])
+
+    def test_pending_json_with_pending_action_includes_action_data(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                log.add_action(Action(
+                    action_type="file.delete",
+                    target="old.txt",
+                    status="pending",
+                    params={"reason": "cleanup"},
+                    result=None,
+                ))
+                log.add_action(Action(
+                    action_type="file.write",
+                    target="done.txt",
+                    status="success",
+                ))
+                with redirect_stdout(output):
+                    exit_code = main(["pending", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertTrue(data["initialized"])
+            self.assertEqual(len(data["pending"]), 1)
+            entry = data["pending"][0]
+            self.assertEqual(entry["action_type"], "file.delete")
+            self.assertEqual(entry["target"], "old.txt")
+            self.assertEqual(entry["status"], "pending")
+            self.assertEqual(entry["params"], {"reason": "cleanup"})
+            self.assertIn("id", entry)
+            self.assertIn("timestamp", entry)
+
+    def test_normal_pending_human_output_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["pending"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("No pending actions.", output.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
