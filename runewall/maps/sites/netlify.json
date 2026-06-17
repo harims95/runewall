@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "site": {
+    "name": "Netlify",
+    "base_url": "https://app.netlify.com",
+    "map_version": "0.1.0"
+  },
+  "flows": {
+    "list_sites": {
+      "risk_level": "low",
+      "reversible": false,
+      "requires_auth": true,
+      "inputs": {},
+      "api_path": {
+        "method": "GET",
+        "url": "/api/v1/sites"
+      }
+    }
+  }
+}
