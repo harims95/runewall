@@ -216,6 +216,32 @@ If Runewall is initialized, the dry-run is logged as `map.dry_run`.
 
 Real map execution is not built yet.
 
+## GitHub create issue execution
+
+Runewall can execute one real mapped action right now: `github create_issue`.
+
+It uses the GitHub REST API, not browser automation.
+
+It requires `GITHUB_TOKEN` from the environment, and it does not store or log the token.
+
+If Runewall is initialized, execution is logged as `map.execute`.
+
+If execution succeeds, the result includes issue number and issue URL when GitHub returns them.
+
+If `GITHUB_TOKEN` is missing, execution fails safely and logs `failed` if Runewall is initialized.
+
+Usage:
+
+```bash
+set GITHUB_TOKEN=your_token_here
+
+runewall act github create_issue --execute --input repo=user/repo --input title="Bug report" --input body="Details"
+```
+
+Tests use mocks.
+
+Do not use a real token unless you intentionally want to create a real GitHub issue.
+
 ## Not built yet
 
 - human approval/reject flow
