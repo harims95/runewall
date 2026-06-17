@@ -38,6 +38,15 @@ class SiteMapRegistryTests(unittest.TestCase):
             f"{invalid_path}: missing required field 'schema_version'",
         )
 
+    def test_load_site_by_key_returns_github(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_site("github")
+
+        self.assertIsNotNone(site_map)
+        assert site_map is not None
+        self.assertEqual(site_map.site_name, "GitHub")
+
 
 if __name__ == "__main__":
     unittest.main()

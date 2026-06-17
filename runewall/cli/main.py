@@ -24,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
     maps_subcommands.add_parser("list", help="List bundled site maps.")
+    maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
+    maps_show_parser.add_argument("site")
     subcommands.add_parser("pending", help="Show pending actions.")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
     read_parser.add_argument("url")
@@ -70,8 +72,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 0
     if args.command == "maps":
+        registry = SiteMapRegistry()
         if args.maps_command == "list":
-            registry = SiteMapRegistry()
             site_maps = registry.list_maps()
             if not site_maps:
                 print("No bundled site maps found.")
@@ -88,6 +90,30 @@ def main(argv: list[str] | None = None) -> int:
                         ]
                     )
                 )
+            return 0
+        if args.maps_command == "show":
+            site_map = registry.load_site(args.site)
+            if site_map is None:
+                print(f"Site map not found: {args.site}")
+                return 1
+
+            print(f"Site name: {site_map.site_name}")
+            print(f"Base URL: {site_map.base_url}")
+            print(f"Map version: {site_map.map_version}")
+            print(f"Schema version: {site_map.schema_version}")
+            print("Available flows:")
+            for flow_name, flow_data in site_map.flows.items():
+                required_inputs = [
+                    input_name
+                    for input_name, input_data in flow_data.get("inputs", {}).items()
+                    if input_data.get("required") is True
+                ]
+                print(f"- {flow_name}")
+                print(f"  description: {flow_data.get('description', '')}")
+                print(f"  risk_level: {flow_data.get('risk_level', '')}")
+                print(f"  reversible: {flow_data.get('reversible', False)}")
+                print(f"  requires_auth: {flow_data.get('requires_auth', False)}")
+                print(f"  required inputs: {', '.join(required_inputs) if required_inputs else 'none'}")
             return 0
     if args.command == "pending":
         log = ActionLog.open_existing(root=Path.cwd())

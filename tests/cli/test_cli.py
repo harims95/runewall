@@ -63,6 +63,33 @@ class CliTests(unittest.TestCase):
         self.assertIn("GitHub", rendered)
         self.assertIn("https://github.com", rendered)
 
+    def test_maps_show_github_prints_create_issue(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "github"])
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: GitHub", rendered)
+        self.assertIn("Base URL: https://github.com", rendered)
+        self.assertIn("Map version: 0.1.0", rendered)
+        self.assertIn("Schema version: 1.0.0", rendered)
+        self.assertIn("- create_issue", rendered)
+        self.assertIn("risk_level: low", rendered)
+        self.assertIn("reversible: True", rendered)
+        self.assertIn("requires_auth: True", rendered)
+        self.assertIn("required inputs: repo, title", rendered)
+
+    def test_maps_show_unknown_site_fails_clearly(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "unknown"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
+
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

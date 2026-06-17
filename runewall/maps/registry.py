@@ -32,6 +32,15 @@ class SiteMapRegistry:
                 maps.append(self.load_map(entry.name))
         return maps
 
+    def load_site(self, site_key: str) -> SiteMap | None:
+        normalized_key = site_key.strip().lower()
+        for site_map in self.list_maps():
+            filename_key = site_map.raw.get("_filename", "").removesuffix(".json").lower()
+            name_key = site_map.site_name.lower()
+            if normalized_key in {filename_key, name_key}:
+                return site_map
+        return None
+
     def load_map(self, filename: str) -> SiteMap:
         map_resource = resources.files("runewall.maps").joinpath("sites", filename)
         with map_resource.open("r", encoding="utf-8") as handle:
@@ -56,7 +65,7 @@ class SiteMapRegistry:
             base_url=base_url,
             map_version=map_version,
             flows=flows,
-            raw=data,
+            raw={**data, "_filename": source},
         )
 
     def _require_dict(self, data: dict[str, Any], key: str, *, source: str) -> dict[str, Any]:
