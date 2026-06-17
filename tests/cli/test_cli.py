@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.cli.main import EMPTY_LOG_MESSAGE, main
+from runewall.core.config import config_path
 from runewall.core.log import ActionLog
 from runewall.core.models import Action
 from runewall.maps import SiteMapRegistry
@@ -33,7 +34,56 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 0)
             self.assertTrue((Path(temp_dir) / ".runewall" / "runewall.db").exists())
+            self.assertTrue((Path(temp_dir) / ".runewall" / "config.toml").exists())
             self.assertIn("Initialized Runewall at", output.getvalue())
+
+    def test_config_path_works(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "path"])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue().strip()
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(rendered, str(config_path(Path(temp_dir)).resolve()))
+
+    def test_config_show_does_not_print_secrets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text(
+                "\n".join(
+                    [
+                        "[safety]",
+                        'default_policy = "review"',
+                        "",
+                        "[auth]",
+                        'github_token_env = "GITHUB_TOKEN"',
+                        'github_token = "super-secret-token"',
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "show"])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("[auth]", rendered)
+        self.assertIn('github_token_env = "GITHUB_TOKEN"', rendered)
+        self.assertIn('github_token = "***REDACTED***"', rendered)
+        self.assertNotIn("super-secret-token", rendered)
 
     def test_log_command_with_empty_database(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sys
 
+from runewall.core.config import config_path, ensure_config, format_config_data, load_config_data
 from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
@@ -40,6 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
     maps_subcommands.add_parser("validate", help="Validate bundled site maps.")
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
+    config_parser = subcommands.add_parser("config", help="Inspect local Runewall config.")
+    config_subcommands = config_parser.add_subparsers(dest="config_command", required=True)
+    config_subcommands.add_parser("path", help="Show the local config path.")
+    config_subcommands.add_parser("show", help="Show the local config.")
     subcommands.add_parser("doctor", help="Check local Runewall health.")
     subcommands.add_parser("pending", help="Show pending actions.")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
@@ -63,8 +68,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "init":
         db_path = initialize_database(Path.cwd())
+        ensure_config(Path.cwd())
         print(f"Initialized Runewall at {db_path}")
         return 0
+    if args.command == "config":
+        if args.config_command == "path":
+            print(str(config_path(Path.cwd()).resolve()))
+            return 0
+        if args.config_command == "show":
+            print(format_config_data(load_config_data(Path.cwd())))
+            return 0
     if args.command == "log":
         log = ActionLog(root=Path.cwd())
         actions = log.list_actions()
