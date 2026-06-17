@@ -7,6 +7,7 @@ from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
 from runewall.core.rollback import RollbackEngine
+from runewall.translate import read_url
 
 
 EMPTY_LOG_MESSAGE = "No actions recorded yet."
@@ -19,6 +20,8 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
     subcommands.add_parser("log", help="Show recorded actions.")
     subcommands.add_parser("pending", help="Show pending actions.")
+    read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
+    read_parser.add_argument("url")
     subcommands.add_parser("status", help="Show current Runewall status.")
     approve_parser = subcommands.add_parser("approve", help="Approve a pending action.")
     approve_parser.add_argument("action_id")
@@ -85,6 +88,19 @@ def main(argv: list[str] | None = None) -> int:
                     ]
                 )
             )
+        return 0
+    if args.command == "read":
+        content = read_url(args.url)
+        preview = content["text"][:200].strip()
+        print(f"Title: {content['title']}")
+        print("Headings:")
+        if content["headings"]:
+            for heading in content["headings"]:
+                print(f"- {heading}")
+        else:
+            print("- none")
+        print("Text preview:")
+        print(preview)
         return 0
     if args.command == "status":
         db_path = database_path(Path.cwd())

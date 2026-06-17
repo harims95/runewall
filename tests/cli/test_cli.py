@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -264,6 +265,31 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 1)
             self.assertEqual(output.getvalue().strip(), f"Action {action.id} is not approved.")
+
+    @patch(
+        "runewall.cli.main.read_url",
+        return_value={
+            "url": "https://example.com",
+            "title": "Example Page",
+            "headings": ["Main Heading", "Section Heading"],
+            "text": "Hello world from Runewall. " * 20,
+        },
+    )
+    def test_read_command_prints_structured_preview(self, mocked_read) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["read", "https://example.com"])
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        mocked_read.assert_called_once_with("https://example.com")
+        self.assertIn("Title: Example Page", rendered)
+        self.assertIn("Headings:", rendered)
+        self.assertIn("- Main Heading", rendered)
+        self.assertIn("- Section Heading", rendered)
+        self.assertIn("Text preview:", rendered)
+        self.assertIn("Hello world from Runewall.", rendered)
 
 
 if __name__ == "__main__":
