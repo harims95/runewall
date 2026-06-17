@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "site": {
+    "name": "Vercel",
+    "base_url": "https://vercel.com",
+    "map_version": "0.1.0"
+  },
+  "flows": {
+    "list_projects": {
+      "risk_level": "low",
+      "reversible": false,
+      "requires_auth": true,
+      "inputs": {},
+      "api_path": {
+        "method": "GET",
+        "url": "/v9/projects"
+      }
+    }
+  }
+}

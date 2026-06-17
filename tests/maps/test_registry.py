@@ -24,6 +24,16 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertEqual(site_map.schema_version, "1.0.0")
         self.assertIn("create_issue", site_map.flows)
 
+    def test_registry_loads_vercel_json(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_map("vercel.json")
+
+        self.assertEqual(site_map.site_name, "Vercel")
+        self.assertEqual(site_map.base_url, "https://vercel.com")
+        self.assertEqual(site_map.schema_version, "1.0.0")
+        self.assertIn("list_projects", site_map.flows)
+
     def test_invalid_map_raises_clear_error(self) -> None:
         registry = SiteMapRegistry()
 
@@ -65,16 +75,20 @@ class SiteMapRegistryTests(unittest.TestCase):
 
         self.assertEqual(str(context.exception), "Flow not found for GitHub: unknown_flow")
 
-    def test_validate_bundled_maps_passes_with_github(self) -> None:
+    def test_validate_bundled_maps_passes_with_github_and_vercel(self) -> None:
         registry = SiteMapRegistry()
 
         results = registry.validate_bundled_maps()
 
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0].site_key, "github")
-        self.assertEqual(results[0].site_name, "GitHub")
-        self.assertTrue(results[0].ok)
-        self.assertIsNone(results[0].error)
+        by_key = {result.site_key: result for result in results}
+
+        self.assertEqual(set(by_key), {"github", "vercel"})
+        self.assertEqual(by_key["github"].site_name, "GitHub")
+        self.assertTrue(by_key["github"].ok)
+        self.assertIsNone(by_key["github"].error)
+        self.assertEqual(by_key["vercel"].site_name, "Vercel")
+        self.assertTrue(by_key["vercel"].ok)
+        self.assertIsNone(by_key["vercel"].error)
 
 
 if __name__ == "__main__":

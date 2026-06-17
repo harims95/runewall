@@ -51,7 +51,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(output.getvalue().strip(), EMPTY_LOG_MESSAGE)
 
-    def test_maps_list_prints_github(self) -> None:
+    def test_maps_list_prints_github_and_vercel(self) -> None:
         output = io.StringIO()
 
         with redirect_stdout(output):
@@ -62,6 +62,8 @@ class CliTests(unittest.TestCase):
         self.assertIn("site_name\tbase_url\tflows", rendered)
         self.assertIn("GitHub", rendered)
         self.assertIn("https://github.com", rendered)
+        self.assertIn("Vercel", rendered)
+        self.assertIn("https://vercel.com", rendered)
 
     def test_maps_show_github_prints_create_issue(self) -> None:
         output = io.StringIO()
@@ -81,6 +83,24 @@ class CliTests(unittest.TestCase):
         self.assertIn("requires_auth: True", rendered)
         self.assertIn("required inputs: repo, title", rendered)
 
+    def test_maps_show_vercel_prints_list_projects(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "vercel"])
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Vercel", rendered)
+        self.assertIn("Base URL: https://vercel.com", rendered)
+        self.assertIn("Map version: 0.1.0", rendered)
+        self.assertIn("Schema version: 1.0.0", rendered)
+        self.assertIn("- list_projects", rendered)
+        self.assertIn("risk_level: low", rendered)
+        self.assertIn("reversible: False", rendered)
+        self.assertIn("requires_auth: True", rendered)
+        self.assertIn("required inputs: none", rendered)
+
     def test_maps_show_unknown_site_fails_clearly(self) -> None:
         output = io.StringIO()
 
@@ -90,7 +110,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
 
-    def test_maps_validate_prints_ok_for_github(self) -> None:
+    def test_maps_validate_prints_ok_for_github_and_vercel(self) -> None:
         output = io.StringIO()
 
         with redirect_stdout(output):
@@ -99,6 +119,7 @@ class CliTests(unittest.TestCase):
         rendered = output.getvalue()
         self.assertEqual(exit_code, 0)
         self.assertIn("github (GitHub)\tOK", rendered)
+        self.assertIn("vercel (Vercel)\tOK", rendered)
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
@@ -194,6 +215,32 @@ class CliTests(unittest.TestCase):
         self.assertIn("- repo=user/repo", rendered)
         self.assertIn("- title=Bug report", rendered)
         self.assertIn("Missing inputs: none", rendered)
+        self.assertIn("Runewall is not initialized; dry run was not logged.", rendered)
+        mocked_execute.assert_not_called()
+
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_dry_run_for_vercel_list_projects(self, mocked_execute) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["act", "vercel", "list_projects", "--dry-run"])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Vercel", rendered)
+        self.assertIn("Flow name: list_projects", rendered)
+        self.assertIn("Risk level: low", rendered)
+        self.assertIn("Reversible: False", rendered)
+        self.assertIn("Requires auth: True", rendered)
+        self.assertIn("Provided inputs:", rendered)
+        self.assertIn("- none", rendered)
+        self.assertIn("Missing inputs: none", rendered)
+        self.assertIn("API path: GET /v9/projects", rendered)
         self.assertIn("Runewall is not initialized; dry run was not logged.", rendered)
         mocked_execute.assert_not_called()
 
