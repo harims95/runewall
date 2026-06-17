@@ -51,6 +51,18 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertEqual(output.getvalue().strip(), EMPTY_LOG_MESSAGE)
 
+    def test_maps_list_prints_github(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list"])
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("site_name\tbase_url\tflows", rendered)
+        self.assertIn("GitHub", rendered)
+        self.assertIn("https://github.com", rendered)
+
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

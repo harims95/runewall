@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0.0",
+  "site": {
+    "name": "GitHub",
+    "base_url": "https://github.com",
+    "map_version": "0.1.0"
+  },
+  "flows": {
+    "create_issue": {
+      "risk_level": "low",
+      "reversible": true,
+      "requires_auth": true,
+      "inputs": {
+        "repo": {
+          "type": "string",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "body": {
+          "type": "string",
+          "required": false
+        }
+      }
+    }
+  }
+}

@@ -6,6 +6,7 @@ from pathlib import Path
 from runewall.core.db import database_path, initialize_database
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
+from runewall.maps import SiteMapRegistry
 from runewall.core.models import Action
 from runewall.core.rollback import RollbackEngine
 from runewall.translate import read_url
@@ -20,6 +21,9 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
     subcommands.add_parser("log", help="Show recorded actions.")
+    maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
+    maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
+    maps_subcommands.add_parser("list", help="List bundled site maps.")
     subcommands.add_parser("pending", help="Show pending actions.")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
     read_parser.add_argument("url")
@@ -65,6 +69,26 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         return 0
+    if args.command == "maps":
+        if args.maps_command == "list":
+            registry = SiteMapRegistry()
+            site_maps = registry.list_maps()
+            if not site_maps:
+                print("No bundled site maps found.")
+                return 0
+
+            print("site_name\tbase_url\tflows")
+            for site_map in site_maps:
+                print(
+                    "\t".join(
+                        [
+                            site_map.site_name,
+                            site_map.base_url,
+                            str(len(site_map.flows)),
+                        ]
+                    )
+                )
+            return 0
     if args.command == "pending":
         log = ActionLog.open_existing(root=Path.cwd())
         if log is None:
