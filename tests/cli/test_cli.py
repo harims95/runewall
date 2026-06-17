@@ -119,6 +119,80 @@ class CliTests(unittest.TestCase):
             self.assertIn("file.write", rendered)
             self.assertIn("demo.txt", rendered)
 
+    def test_approve_changes_pending_to_approved(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                action = log.add_action(Action(action_type="file.delete", target="old.txt"))
+                with redirect_stdout(output):
+                    exit_code = main(["approve", action.id])
+                updated = log.get_action(action.id)
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertIsNotNone(updated)
+            assert updated is not None
+            self.assertEqual(updated.status, "approved")
+            self.assertIn(f"Approved action {action.id}.", output.getvalue())
+
+    def test_reject_changes_pending_to_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                action = log.add_action(Action(action_type="file.delete", target="old.txt"))
+                with redirect_stdout(output):
+                    exit_code = main(["reject", action.id])
+                updated = log.get_action(action.id)
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertIsNotNone(updated)
+            assert updated is not None
+            self.assertEqual(updated.status, "rejected")
+            self.assertIn(f"Rejected action {action.id}.", output.getvalue())
+
+    def test_approving_non_existent_action_gives_clear_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["approve", "missing-id"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(output.getvalue().strip(), "Action not found: missing-id")
+
+    def test_rejecting_non_existent_action_gives_clear_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["reject", "missing-id"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(output.getvalue().strip(), "Action not found: missing-id")
+
 
 if __name__ == "__main__":
     unittest.main()

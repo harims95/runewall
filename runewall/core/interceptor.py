@@ -10,6 +10,10 @@ from .rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine
 from .snapshot import SnapshotEngine
 
 
+class PendingReviewError(RuntimeError):
+    """Raised when an action is logged as pending human review."""
+
+
 @contextmanager
 def protect_file_write(
     target: str | Path,
@@ -88,13 +92,16 @@ def _protect_file_action(
     policy = rules_engine.evaluate(action)
     action.rule_applied = policy
 
-    if policy == BLOCK:
-        raise PermissionError(f"{action_type} is blocked under policy {policy}")
-    if policy == REVIEW and not allow_review_override:
-        raise PermissionError(f"{action_type} requires approval under policy {policy}")
-
     log = ActionLog(root=resolved_root)
     snapshot_engine = SnapshotEngine(root=resolved_root)
+
+    if policy == BLOCK:
+        action.status = "blocked"
+        log.add_action(action)
+        raise PermissionError(f"{action_type} is blocked under policy {policy}")
+    if policy == REVIEW and not allow_review_override:
+        log.add_action(action)
+        raise PendingReviewError(f"{action_type} is pending review")
 
     if policy == SNAPSHOT or (policy == REVIEW and allow_review_override):
         snapshot = snapshot_engine.create_snapshot(action)

@@ -17,6 +17,15 @@ def new_uuid() -> str:
 JSONScalar: TypeAlias = str | int | float | bool | None
 JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
 RulePolicy: TypeAlias = Literal["AUTO", "SNAPSHOT", "REVIEW", "BLOCK"]
+ActionStatus: TypeAlias = Literal[
+    "pending",
+    "approved",
+    "rejected",
+    "success",
+    "failed",
+    "rolled_back",
+    "blocked",
+]
 
 
 @dataclass(slots=True)
@@ -26,7 +35,7 @@ class Action:
     params: JSONValue = None
     agent_id: str | None = None
     risk_level: str = "low"
-    status: str = "pending"
+    status: ActionStatus = "pending"
     rule_applied: str | None = None
     snapshot_id: str | None = None
     result: JSONValue = None

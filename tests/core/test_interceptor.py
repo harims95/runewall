@@ -11,6 +11,9 @@ if str(ROOT) not in sys.path:
 
 from runewall import protect_file_create, protect_file_delete, protect_file_write
 from runewall.core.log import ActionLog
+from runewall.core.interceptor import PendingReviewError
+from runewall.core.models import Rule
+from runewall.core.rules import BLOCK
 
 
 class ProtectFileWriteTests(unittest.TestCase):
@@ -131,6 +134,42 @@ class ProtectFileWriteTests(unittest.TestCase):
             self.assertIsNotNone(action)
             assert action is not None
             self.assertEqual(action.status, "failed")
+
+    def test_review_action_becomes_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "old.txt"
+            target.write_text("before", encoding="utf-8")
+
+            with self.assertRaisesRegex(PendingReviewError, "file.delete is pending review"):
+                with protect_file_delete("old.txt", root=root, require_review=True):
+                    target.unlink()
+
+            action = ActionLog(root=root).get_last_action()
+            self.assertIsNotNone(action)
+            assert action is not None
+            self.assertEqual(action.status, "pending")
+            self.assertTrue(target.exists())
+
+    def test_block_action_raises_and_does_not_log_as_success(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            target = root / "demo.txt"
+            target.write_text("before", encoding="utf-8")
+
+            with self.assertRaisesRegex(PermissionError, "file.write is blocked under policy BLOCK"):
+                with protect_file_write(
+                    "demo.txt",
+                    root=root,
+                    rules=[Rule(pattern="file.write", policy=BLOCK, priority=10)],
+                ):
+                    target.write_text("after", encoding="utf-8")
+
+            action = ActionLog(root=root).get_last_action()
+            self.assertIsNotNone(action)
+            assert action is not None
+            self.assertNotEqual(action.status, "success")
+            self.assertEqual(action.status, "blocked")
 
 
 if __name__ == "__main__":

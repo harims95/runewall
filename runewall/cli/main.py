@@ -18,6 +18,10 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
     subcommands.add_parser("log", help="Show recorded actions.")
     subcommands.add_parser("status", help="Show current Runewall status.")
+    approve_parser = subcommands.add_parser("approve", help="Approve a pending action.")
+    approve_parser.add_argument("action_id")
+    reject_parser = subcommands.add_parser("reject", help="Reject a pending action.")
+    reject_parser.add_argument("action_id")
     rollback_parser = subcommands.add_parser("rollback", help="Rollback a recorded action.")
     rollback_parser.add_argument("action_id", nargs="?")
     rollback_parser.add_argument("--last", action="store_true")
@@ -78,6 +82,30 @@ def main(argv: list[str] | None = None) -> int:
                 f"{latest_action.id} | {latest_action.timestamp} | "
                 f"{latest_action.action_type} | {latest_action.target} | {latest_action.status}"
             )
+        return 0
+    if args.command == "approve":
+        log = ActionLog.open_existing(root=Path.cwd())
+        if log is None:
+            print(NOT_INITIALIZED_MESSAGE)
+            return 0
+        action = log.get_action(args.action_id)
+        if action is None:
+            print(f"Action not found: {args.action_id}")
+            return 1
+        log.update_action_status(args.action_id, "approved")
+        print(f"Approved action {args.action_id}.")
+        return 0
+    if args.command == "reject":
+        log = ActionLog.open_existing(root=Path.cwd())
+        if log is None:
+            print(NOT_INITIALIZED_MESSAGE)
+            return 0
+        action = log.get_action(args.action_id)
+        if action is None:
+            print(f"Action not found: {args.action_id}")
+            return 1
+        log.update_action_status(args.action_id, "rejected")
+        print(f"Rejected action {args.action_id}.")
         return 0
     if args.command == "rollback":
         engine = RollbackEngine(root=Path.cwd())

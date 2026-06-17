@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from .db import connect, initialize_database
-from .models import Action, Snapshot
+from .models import Action, ActionStatus, Snapshot
 
 
 class ActionLog:
@@ -117,7 +117,20 @@ class ActionLog:
             ).fetchall()
         return [self._row_to_action(row) for row in rows]
 
-    def update_action_status(self, action_id: str, status: str) -> bool:
+    def list_pending_actions(self) -> list[Action]:
+        with closing(connect(self._db_path)) as connection:
+            rows = connection.execute(
+                """
+                SELECT id, timestamp, agent_id, action_type, target, params, risk_level,
+                       status, rule_applied, snapshot_id, result, reversible, reasoning
+                FROM actions
+                WHERE status = 'pending'
+                ORDER BY timestamp ASC, id ASC
+                """
+            ).fetchall()
+        return [self._row_to_action(row) for row in rows]
+
+    def update_action_status(self, action_id: str, status: ActionStatus) -> bool:
         with closing(connect(self._db_path)) as connection:
             cursor = connection.execute(
                 "UPDATE actions SET status = ? WHERE id = ?",
