@@ -11,6 +11,7 @@ BLOCK: RulePolicy = "BLOCK"
 
 DEFAULT_POLICIES: dict[str, RulePolicy] = {
     "file.read": AUTO,
+    "file.create": SNAPSHOT,
     "file.write": SNAPSHOT,
     "file.delete": REVIEW,
     "shell.exec": REVIEW,
