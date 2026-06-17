@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 from runewall.cli.main import EMPTY_LOG_MESSAGE, main
 from runewall.core.log import ActionLog
 from runewall.core.models import Action
+from runewall.maps import SiteMapRegistry
 
 
 class CliTests(unittest.TestCase):
@@ -65,6 +66,18 @@ class CliTests(unittest.TestCase):
         self.assertIn("Vercel", rendered)
         self.assertIn("https://vercel.com", rendered)
 
+    def test_maps_path_prints_absolute_bundled_maps_path(self) -> None:
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "path"])
+
+        rendered = output.getvalue().strip()
+        normalized = rendered.replace("\\", "/")
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(Path(rendered).is_absolute())
+        self.assertIn("maps/sites", normalized)
+
     def test_maps_show_github_prints_create_issue(self) -> None:
         output = io.StringIO()
 
@@ -109,6 +122,17 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         self.assertEqual(output.getvalue().strip(), "Site map not found: unknown")
+
+    @patch.object(SiteMapRegistry, "bundled_maps_path")
+    def test_maps_path_missing_directory_fails_clearly(self, mocked_path) -> None:
+        mocked_path.return_value = Path("missing-maps-dir")
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            exit_code = main(["maps", "path"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(output.getvalue().strip(), "Bundled maps directory not found: missing-maps-dir")
 
     def test_maps_validate_prints_ok_for_github_and_vercel(self) -> None:
         output = io.StringIO()

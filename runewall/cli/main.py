@@ -36,6 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
     maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
     maps_subcommands.add_parser("list", help="List bundled site maps.")
+    maps_subcommands.add_parser("path", help="Show the bundled site maps directory.")
     maps_subcommands.add_parser("validate", help="Validate bundled site maps.")
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
@@ -202,6 +203,13 @@ def main(argv: list[str] | None = None) -> int:
                         ]
                     )
                 )
+            return 0
+        if args.maps_command == "path":
+            maps_path = registry.bundled_maps_path()
+            if not maps_path.is_dir():
+                print(f"Bundled maps directory not found: {maps_path}")
+                return 1
+            print(str(maps_path))
             return 0
         if args.maps_command == "validate":
             results = registry.validate_bundled_maps()

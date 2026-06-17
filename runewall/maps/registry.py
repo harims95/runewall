@@ -40,6 +40,9 @@ class MapValidationResult:
 class SiteMapRegistry:
     """Loads bundled JSON site maps from runewall.maps.sites."""
 
+    def bundled_maps_path(self) -> Path:
+        return Path(__file__).resolve().parent / "sites"
+
     def list_maps(self) -> list[SiteMap]:
         maps: list[SiteMap] = []
         sites_root = resources.files("runewall.maps").joinpath("sites")

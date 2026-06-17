@@ -58,6 +58,15 @@ class SiteMapRegistryTests(unittest.TestCase):
         assert site_map is not None
         self.assertEqual(site_map.site_name, "GitHub")
 
+    def test_bundled_maps_path_is_absolute_and_exists(self) -> None:
+        registry = SiteMapRegistry()
+
+        maps_path = registry.bundled_maps_path()
+
+        self.assertTrue(maps_path.is_absolute())
+        self.assertTrue(maps_path.is_dir())
+        self.assertIn("maps/sites", maps_path.as_posix())
+
     def test_require_site_raises_clear_error_for_unknown_site(self) -> None:
         registry = SiteMapRegistry()
 
