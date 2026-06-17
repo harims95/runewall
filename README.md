@@ -270,30 +270,34 @@ Set a config value:
 
 ```bash
 runewall config set maps.allow_execute true
+runewall config set maps.allow_execute false
 runewall config set safety.max_snapshot_mb 100
+runewall config set retention.snapshot_days 30
 runewall config set auth.github_token_env GITHUB_TOKEN
 ```
 
-If the config file does not exist yet, `config set` creates it first. Unknown keys are rejected with a clear error.
+`config set` behavior:
+
+- If `.runewall/config.toml` does not exist, it is created with defaults first.
+- Only known config keys are accepted. Unknown keys fail with a clear error.
+- Invalid values (wrong boolean, non-integer) fail with a clear error.
+- Secret-like values are not printed in the success output.
+
+`maps.allow_execute` controls whether real map execution is allowed:
+
+- `false` (default): real execution is blocked. Dry-run still works normally.
+- `true`: real execution is permitted.
+
+Dry-run map planning works without changing any config.
+
+To run `github create_issue` for real, you need both:
+
+1. `maps.allow_execute = true` in `.runewall/config.toml`
+2. `GITHUB_TOKEN` set in the environment
+
+If either is missing, execution fails with a clear error and nothing is sent to GitHub.
 
 The config is local-first. It is never uploaded or sent anywhere.
-
-**Dry-run map planning works by default.** No config changes are needed.
-
-**Real map execution is disabled by default.** The `[maps]` section controls this.
-
-To enable `github create_issue` execution, edit `.runewall/config.toml` and set:
-
-```toml
-[maps]
-allow_execute = true
-```
-
-If `allow_execute` is `false` or the config file is missing, execution is blocked with a clear error:
-
-```
-Map execution is disabled by config. Set [maps] allow_execute = true to enable.
-```
 
 `GITHUB_TOKEN` is always read from the environment only. It is never printed, stored in the config file, or written to the action log.
 
