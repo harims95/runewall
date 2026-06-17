@@ -233,6 +233,60 @@ Only `GitHub create_issue` has real API execution right now.
 
 No browser automation is used for these maps.
 
+## Local config
+
+`runewall init` creates `.runewall/config.toml` in the current directory.
+
+The default config looks like this:
+
+```toml
+[safety]
+default_policy = "review"
+max_snapshot_mb = 500
+
+[retention]
+snapshot_days = 30
+
+[maps]
+allow_execute = false
+
+[auth]
+github_token_env = "GITHUB_TOKEN"
+```
+
+Print the config file location:
+
+```bash
+runewall config path
+```
+
+Print the current config (secret-like values are redacted):
+
+```bash
+runewall config show
+```
+
+The config is local-first. It is never uploaded or sent anywhere.
+
+**Dry-run map planning works by default.** No config changes are needed.
+
+**Real map execution is disabled by default.** The `[maps]` section controls this.
+
+To enable `github create_issue` execution, edit `.runewall/config.toml` and set:
+
+```toml
+[maps]
+allow_execute = true
+```
+
+If `allow_execute` is `false` or the config file is missing, execution is blocked with a clear error:
+
+```
+Map execution is disabled by config. Set [maps] allow_execute = true to enable.
+```
+
+`GITHUB_TOKEN` is always read from the environment only. It is never printed, stored in the config file, or written to the action log.
+
 ## GitHub create issue execution
 
 Runewall can execute one real mapped action right now: `github create_issue`.
@@ -240,6 +294,8 @@ Runewall can execute one real mapped action right now: `github create_issue`.
 It uses the GitHub REST API, not browser automation.
 
 It requires `GITHUB_TOKEN` from the environment, and it does not store or log the token.
+
+It also requires `allow_execute = true` in `.runewall/config.toml`. See [Local config](#local-config).
 
 If Runewall is initialized, execution is logged as `map.execute`.
 
