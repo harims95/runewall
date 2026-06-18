@@ -532,6 +532,45 @@ It checks:
 
 `runewall maps stats` shows a breakdown of real-execution maps vs dry-run-only maps.
 
+## Release readiness checklist
+
+Before creating a release tag or a local checkpoint, use this flow:
+
+```bash
+runewall config profile safe
+runewall config validate
+runewall policy audit
+runewall maps lint --strict
+runewall doctor
+runewall release check
+python -m pytest tests -v
+```
+
+What each step does:
+
+- `runewall config profile safe` resets local config to safe defaults.
+- `runewall config validate` checks `.runewall/config.toml` for invalid values.
+- `runewall policy audit` warns about risky policy settings.
+- `runewall maps lint --strict` checks bundled map quality and treats warnings as release blockers.
+- `runewall doctor` checks local runtime health.
+- `runewall release check` combines the main local release safety checks in one command.
+- `python -m pytest tests -v` runs the test suite.
+
+Notes:
+
+- `runewall release check` does not call external APIs.
+- `runewall release check` does not require tokens.
+- `runewall release check` does not modify config, DB, logs, snapshots, or maps.
+- `maps.allow_execute` should normally be `false` before tagging a release.
+
+After a clean release check and passing tests, create a tag:
+
+```bash
+git status
+git tag v0.1.x-name
+git tag
+```
+
 ## Agent-readable JSON output
 
 Runewall supports machine-readable JSON output for agents and automation.
