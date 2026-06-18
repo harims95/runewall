@@ -1460,6 +1460,98 @@ class CliTests(unittest.TestCase):
             self.assertIn("No pending actions.", output.getvalue())
 
 
+    def test_act_dry_run_json_success_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "github", "create_issue", "--dry-run", "--json",
+                "--input", "repo=user/repo",
+                "--input", "title=Bug",
+                "--input", "body=Details",
+            ])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "github")
+        self.assertEqual(data["flow"], "create_issue")
+        self.assertEqual(data["risk_level"], "low")
+        self.assertTrue(data["reversible"])
+        self.assertTrue(data["requires_auth"])
+        self.assertEqual(data["missing_inputs"], [])
+        self.assertIn("provided_inputs", data)
+        self.assertIn("ui_steps_count", data)
+
+    def test_act_dry_run_json_missing_input_prints_json_error_and_exits_nonzero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "github", "create_issue", "--dry-run", "--json",
+                "--input", "repo=user/repo",
+            ])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "github")
+        self.assertEqual(data["flow"], "create_issue")
+        self.assertIn("Missing required inputs", data["error"])
+
+    def test_act_dry_run_json_with_init_logs_action(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "github", "create_issue", "--dry-run", "--json",
+                        "--input", "repo=user/repo",
+                        "--input", "title=Bug",
+                    ])
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual(action.action_type, "map.dry_run")
+        self.assertEqual(action.status, "success")
+        import json as _json
+        _json.loads(output.getvalue())
+
+    def test_act_json_without_dry_run_fails_clearly(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "github", "create_issue", "--execute", "--json",
+                "--input", "repo=user/repo",
+                "--input", "title=Bug",
+            ])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("--json requires --dry-run", output.getvalue())
+
+    def test_act_dry_run_human_output_unchanged_after_json_added(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "github", "create_issue", "--dry-run",
+                "--input", "repo=user/repo",
+                "--input", "title=Bug",
+            ])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Site name: GitHub", rendered)
+        self.assertIn("Flow name: create_issue", rendered)
+        self.assertIn("Risk level: low", rendered)
+        self.assertIn("Missing inputs: none", rendered)
+
     def test_maps_list_json_prints_valid_json(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

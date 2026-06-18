@@ -37,6 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     act_parser.add_argument("--dry-run", action="store_true")
     act_parser.add_argument("--execute", action="store_true")
     act_parser.add_argument("--input", action="append", default=[])
+    act_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
     maps_list_parser = maps_subcommands.add_parser("list", help="List bundled site maps.")
@@ -144,6 +145,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run and args.execute:
             print("Choose only one of --dry-run or --execute.")
             return 1
+        if args.json_output and not args.dry_run:
+            print("--json requires --dry-run.")
+            return 1
 
         log = ActionLog.open_existing(root=Path.cwd())
         inputs: dict[str, str] = {}
@@ -158,13 +162,62 @@ def main(argv: list[str] | None = None) -> int:
         try:
             plan = planner.build_plan(args.site, args.flow, inputs)
         except SiteMapNotFoundError as error:
-            print(str(error))
+            if args.json_output:
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error)}))
+            else:
+                print(str(error))
             return 1
         except FlowNotFoundError as error:
-            print(str(error))
+            if args.json_output:
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error)}))
+            else:
+                print(str(error))
             return 1
 
         validation_error = missing_inputs_error(plan)
+
+        if args.json_output:
+            if validation_error is not None:
+                if log is not None:
+                    log.add_action(
+                        Action(
+                            action_type="map.dry_run",
+                            target=f"{args.site}:{args.flow}",
+                            status="failed",
+                            params={"site": args.site, "flow": args.flow, "inputs": inputs},
+                            result={"error": validation_error},
+                            reversible=False,
+                        )
+                    )
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": validation_error}))
+                return 1
+            if log is not None:
+                log.add_action(
+                    Action(
+                        action_type="map.dry_run",
+                        target=f"{args.site}:{args.flow}",
+                        status="success",
+                        params={"site": args.site, "flow": args.flow, "inputs": inputs},
+                        result=dry_run_result(plan),
+                        reversible=False,
+                    )
+                )
+            print(json.dumps({
+                "ok": True,
+                "executed": False,
+                "site": args.site,
+                "flow": args.flow,
+                "description": plan.description,
+                "risk_level": plan.risk_level,
+                "reversible": plan.reversible,
+                "requires_auth": plan.requires_auth,
+                "provided_inputs": plan.provided_inputs,
+                "missing_inputs": plan.missing_inputs,
+                "api_path": plan.api_path,
+                "ui_steps_count": plan.ui_steps_count,
+            }))
+            return 0
+
         if args.dry_run:
             print(render_plan(plan))
         if validation_error is not None:
