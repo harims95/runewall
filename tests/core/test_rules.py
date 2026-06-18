@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.core.models import Action, Rule
-from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine, explain_policy
+from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine, explain_policy, list_policies
 
 
 class RulesEngineTests(unittest.TestCase):
@@ -33,6 +33,20 @@ class RulesEngineTests(unittest.TestCase):
         policy = engine.evaluate(Action(action_type="file.delete", target="notes.txt"))
 
         self.assertEqual(policy, REVIEW)
+
+    def test_web_read_returns_auto(self) -> None:
+        engine = RulesEngine()
+
+        policy = engine.evaluate(Action(action_type="web.read", target="https://example.com"))
+
+        self.assertEqual(policy, AUTO)
+
+    def test_map_dry_run_returns_auto(self) -> None:
+        engine = RulesEngine()
+
+        policy = engine.evaluate(Action(action_type="map.dry_run", target="github:create_issue"))
+
+        self.assertEqual(policy, AUTO)
 
     def test_shell_exec_returns_review(self) -> None:
         engine = RulesEngine()
@@ -140,6 +154,22 @@ class RulesFromConfigTests(unittest.TestCase):
         explanation = explain_policy("calendar.invite", RunewallConfig(safety=SafetyConfig(default_policy="snapshot")))
         self.assertEqual(explanation.policy, REVIEW)
         self.assertEqual(explanation.source, "unknown_fallback")
+
+    def test_list_policies_includes_standard_action_types(self) -> None:
+        from runewall.core.config import RunewallConfig
+        policies = list_policies(RunewallConfig())
+        self.assertEqual(
+            tuple(policies),
+            ("file.read", "file.write", "file.create", "file.delete", "web.read", "map.dry_run", "map.execute", "unknown"),
+        )
+        self.assertEqual(policies["map.execute"].policy, REVIEW)
+        self.assertEqual(policies["unknown"].policy, REVIEW)
+
+    def test_list_policies_uses_configured_unknown_rule(self) -> None:
+        from runewall.core.config import RulesConfig, RunewallConfig
+        policies = list_policies(RunewallConfig(rules=RulesConfig(unknown="block")))
+        self.assertEqual(policies["unknown"].policy, BLOCK)
+        self.assertEqual(policies["unknown"].reason, 'rules.unknown = "block"')
 
 
 if __name__ == "__main__":

@@ -16,6 +16,9 @@ DEFAULT_POLICIES: dict[str, RulePolicy] = {
     "file.create": SNAPSHOT,
     "file.write": SNAPSHOT,
     "file.delete": REVIEW,
+    "web.read": AUTO,
+    "map.dry_run": AUTO,
+    "map.execute": REVIEW,
     "shell.exec": REVIEW,
     "email.send": REVIEW,
 }
@@ -44,6 +47,16 @@ _SOURCE_LABELS: dict[str, str] = {
     "default_policy_fallback": "default_policy fallback",
     "unknown_fallback": "unknown fallback",
 }
+POLICY_ACTION_TYPES: tuple[str, ...] = (
+    "file.read",
+    "file.write",
+    "file.create",
+    "file.delete",
+    "web.read",
+    "map.dry_run",
+    "map.execute",
+    "unknown",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,3 +174,19 @@ def explain_policy(action_type: str, config: RunewallConfig) -> PolicyExplanatio
         reason='built-in unknown fallback = "review"',
     )
 
+
+def list_policies(config: RunewallConfig) -> dict[str, PolicyExplanation]:
+    """List effective policy explanations for the standard action types."""
+    policies: dict[str, PolicyExplanation] = {}
+    for action_type in POLICY_ACTION_TYPES:
+        resolved_action_type = "unknown.action" if action_type == "unknown" else action_type
+        explanation = explain_policy(resolved_action_type, config)
+        if action_type == "unknown":
+            explanation = PolicyExplanation(
+                action_type="unknown",
+                policy=explanation.policy,
+                source=explanation.source,
+                reason=explanation.reason,
+            )
+        policies[action_type] = explanation
+    return policies
