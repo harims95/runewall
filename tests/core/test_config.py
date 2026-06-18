@@ -106,6 +106,30 @@ class ConfigSetTests(unittest.TestCase):
             self.assertTrue(config_path(root).exists())
             self.assertTrue(load_config(root).maps.allow_execute)
 
+    def test_set_auth_vercel_token_env_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("auth.vercel_token_env", "MY_VERCEL_TOKEN", root=root)
+            self.assertEqual(load_config(root).auth.vercel_token_env, "MY_VERCEL_TOKEN")
+
+    def test_set_auth_netlify_token_env_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("auth.netlify_token_env", "MY_NETLIFY_TOKEN", root=root)
+            self.assertEqual(load_config(root).auth.netlify_token_env, "MY_NETLIFY_TOKEN")
+
+    def test_set_auth_supabase_access_token_env_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("auth.supabase_access_token_env", "MY_SUPABASE_TOKEN", root=root)
+            self.assertEqual(load_config(root).auth.supabase_access_token_env, "MY_SUPABASE_TOKEN")
+
+    def test_set_auth_cloudflare_api_token_env_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("auth.cloudflare_api_token_env", "MY_CF_TOKEN", root=root)
+            self.assertEqual(load_config(root).auth.cloudflare_api_token_env, "MY_CF_TOKEN")
+
     def test_set_unknown_key_raises_clearly(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(ValueError) as context:
