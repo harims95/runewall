@@ -115,20 +115,63 @@ def _release_check_report(root: Path) -> dict[str, object]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="runewall")
+    parser = argparse.ArgumentParser(
+        prog="runewall",
+        description="Runewall is a local-first safety/runtime layer for AI agents.",
+        epilog=(
+            "Major commands:\n"
+            "  init     initialize local Runewall state\n"
+            "  status   show local runtime status\n"
+            "  log      show action log\n"
+            "  act      dry-run or execute mapped actions\n"
+            "  maps     inspect bundled action maps\n"
+            "  config   inspect and manage local config\n"
+            "  policy   explain, test, list, and audit safety policies\n"
+            "  doctor   check local runtime health\n"
+            "  release  run release readiness checks\n"
+            "  read     read a URL through Runewall\n"
+            "  cleanup  clean old local artifacts"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     subcommands = parser.add_subparsers(dest="command", required=True)
-    init_parser = subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
+    init_parser = subcommands.add_parser(
+        "init",
+        help="Initialize local Runewall state.",
+        description="Initialize local Runewall state in the current directory.",
+    )
     init_parser.add_argument("--json", action="store_true", dest="json_output")
-    log_parser = subcommands.add_parser("log", help="Show recorded actions.")
+    log_parser = subcommands.add_parser("log", help="Show action log.", description="Show the local Runewall action log.")
     log_parser.add_argument("--json", action="store_true", dest="json_output")
-    act_parser = subcommands.add_parser("act", help="Plan a mapped site flow.")
+    act_parser = subcommands.add_parser(
+        "act",
+        help="Dry-run or execute mapped actions.",
+        description="Dry-run or execute a mapped action flow.",
+        epilog=(
+            "Examples:\n"
+            "  runewall act github create_issue --dry-run --input repo=user/repo --input title=\"Bug\"\n"
+            "  runewall act vercel list_projects --execute --json"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     act_parser.add_argument("site")
     act_parser.add_argument("flow")
     act_parser.add_argument("--dry-run", action="store_true")
     act_parser.add_argument("--execute", action="store_true")
     act_parser.add_argument("--input", action="append", default=[])
     act_parser.add_argument("--json", action="store_true", dest="json_output")
-    maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
+    maps_parser = subcommands.add_parser(
+        "maps",
+        help="Inspect bundled action maps.",
+        description="Inspect bundled action maps.",
+        epilog=(
+            "Examples:\n"
+            "  runewall maps list\n"
+            "  runewall maps lint --strict\n"
+            "  runewall maps show github --json"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
     maps_list_parser = maps_subcommands.add_parser("list", help="List bundled site maps.")
     maps_list_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -150,7 +193,18 @@ def build_parser() -> argparse.ArgumentParser:
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
     maps_show_parser.add_argument("--json", action="store_true", dest="json_output")
-    config_parser = subcommands.add_parser("config", help="Inspect local Runewall config.")
+    config_parser = subcommands.add_parser(
+        "config",
+        help="Inspect and manage local config.",
+        description="Inspect and manage local Runewall config.",
+        epilog=(
+            "Examples:\n"
+            "  runewall config show\n"
+            "  runewall config set maps.allow_execute true\n"
+            "  runewall config validate"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     config_subcommands = config_parser.add_subparsers(dest="config_command", required=True)
     config_path_parser = config_subcommands.add_parser("path", help="Show the local config path.")
     config_path_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -167,7 +221,18 @@ def build_parser() -> argparse.ArgumentParser:
     config_profile_parser = config_subcommands.add_parser("profile", help="Apply a named config profile.")
     config_profile_parser.add_argument("name")
     config_profile_parser.add_argument("--json", action="store_true", dest="json_output")
-    policy_parser = subcommands.add_parser("policy", help="Explain policy resolution for an action type.")
+    policy_parser = subcommands.add_parser(
+        "policy",
+        help="Explain, test, list, and audit safety policies.",
+        description="Explain, test, list, and audit Runewall safety policies.",
+        epilog=(
+            "Examples:\n"
+            "  runewall policy explain file.write\n"
+            "  runewall policy test map.execute --json\n"
+            "  runewall policy audit"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     policy_subcommands = policy_parser.add_subparsers(dest="policy_command", required=True)
     policy_explain_parser = policy_subcommands.add_parser("explain", help="Explain which policy applies to an action type.")
     policy_explain_parser.add_argument("action_type")
@@ -181,11 +246,21 @@ def build_parser() -> argparse.ArgumentParser:
     policy_audit_parser.add_argument("--json", action="store_true", dest="json_output")
     version_parser = subcommands.add_parser("version", help="Print Runewall version.")
     version_parser.add_argument("--json", action="store_true", dest="json_output")
-    doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
+    doctor_parser = subcommands.add_parser(
+        "doctor",
+        help="Check local runtime health.",
+        description="Check local Runewall runtime health.",
+        epilog=(
+            "Examples:\n"
+            "  runewall doctor\n"
+            "  runewall doctor --json"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     doctor_parser.add_argument("--json", action="store_true", dest="json_output")
     pending_parser = subcommands.add_parser("pending", help="Show pending actions.")
     pending_parser.add_argument("--json", action="store_true", dest="json_output")
-    read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
+    read_parser = subcommands.add_parser("read", help="Read a URL through Runewall.", description="Read a URL through Runewall without a browser.")
     read_parser.add_argument("url")
     read_parser.add_argument("--json", action="store_true", dest="json_output")
     status_parser = subcommands.add_parser("status", help="Show current Runewall status.")
@@ -203,11 +278,21 @@ def build_parser() -> argparse.ArgumentParser:
     rollback_parser.add_argument("action_id", nargs="?")
     rollback_parser.add_argument("--last", action="store_true")
     rollback_parser.add_argument("--json", action="store_true", dest="json_output")
-    cleanup_parser = subcommands.add_parser("cleanup", help="Clean up old Runewall data.")
+    cleanup_parser = subcommands.add_parser("cleanup", help="Clean old local artifacts.", description="Clean old local Runewall artifacts.")
     cleanup_subcommands = cleanup_parser.add_subparsers(dest="cleanup_command", required=True)
     cleanup_snapshots_parser = cleanup_subcommands.add_parser("snapshots", help="Delete snapshot directories older than retention period.")
     cleanup_snapshots_parser.add_argument("--json", action="store_true", dest="json_output")
-    release_parser = subcommands.add_parser("release", help="Run local release readiness checks.")
+    release_parser = subcommands.add_parser(
+        "release",
+        help="Run release readiness checks.",
+        description="Run local release readiness checks.",
+        epilog=(
+            "Examples:\n"
+            "  runewall release check\n"
+            "  runewall release check --json"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     release_subcommands = release_parser.add_subparsers(dest="release_command", required=True)
     release_check_parser = release_subcommands.add_parser("check", help="Check whether the local project is ready for a safe release checkpoint.")
     release_check_parser.add_argument("--json", action="store_true", dest="json_output")

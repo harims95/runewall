@@ -22,6 +22,46 @@ from runewall.maps import SiteMapRegistry
 
 
 class CliTests(unittest.TestCase):
+    def test_top_level_help_exits_zero_and_mentions_local_first(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            with self.assertRaises(SystemExit) as error:
+                main(["--help"])
+        self.assertEqual(error.exception.code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Runewall is a local-first safety/runtime layer for AI agents.", rendered)
+        self.assertIn("policy   explain, test, list, and audit safety policies", rendered)
+
+    def test_policy_help_exits_zero_and_mentions_audit(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            with self.assertRaises(SystemExit) as error:
+                main(["policy", "--help"])
+        self.assertEqual(error.exception.code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Explain, test, list, and audit Runewall safety policies.", rendered)
+        self.assertIn("audit", rendered)
+
+    def test_release_help_exits_zero_and_mentions_check(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            with self.assertRaises(SystemExit) as error:
+                main(["release", "--help"])
+        self.assertEqual(error.exception.code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Run local release readiness checks.", rendered)
+        self.assertIn("check", rendered)
+
+    def test_maps_help_exits_zero_and_mentions_lint(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            with self.assertRaises(SystemExit) as error:
+                main(["maps", "--help"])
+        self.assertEqual(error.exception.code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Inspect bundled action maps.", rendered)
+        self.assertIn("lint", rendered)
+
     def test_version_prints_human_readable_output(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
