@@ -386,6 +386,158 @@ class CliTests(unittest.TestCase):
             self.assertIn("Map execution: ENABLED", rendered)
             self.assertIn("Summary: WARN", rendered)
 
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_prints_valid_json(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("python", data)
+        self.assertIn("database", data)
+        self.assertIn("config", data)
+        self.assertIn("dependencies", data)
+        self.assertIn("auth", data)
+        self.assertIn("maps", data)
+        self.assertIn("summary", data)
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"GITHUB_TOKEN": "super-secret-token"}, clear=True)
+    def test_doctor_json_does_not_print_token_value(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["doctor", "--json"])
+        self.assertEqual(exit_code, 0)
+        self.assertNotIn("super-secret-token", output.getvalue())
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["auth"]["github_token"], "present")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_shows_config_present_after_init(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["config"]["present"])
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_shows_config_missing_before_init(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["config"]["present"])
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_shows_map_execution_disabled_by_default(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["config"]["map_execution"], "disabled")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_shows_warn_when_map_execution_enabled(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "maps.allow_execute", "true"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["config"]["map_execution"], "ENABLED")
+        self.assertEqual(data["summary"], "WARN")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_normal_human_output_unchanged(self, mocked_find_spec) -> None:
+        def fake_find_spec(name: str) -> object | None:
+            if name in {"httpx", "bs4"}:
+                return object()
+            return None
+
+        mocked_find_spec.side_effect = fake_find_spec
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Python:", rendered)
+        self.assertIn("Runewall DB:", rendered)
+        self.assertIn("Config:", rendered)
+        self.assertIn("Summary:", rendered)
+        self.assertNotIn("{", rendered)
+
     @patch("runewall.cli.main.execute_map_action")
     def test_act_dry_run_for_github_create_issue(self, mocked_execute) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -57,7 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
     config_set_parser = config_subcommands.add_parser("set", help="Set a config value.")
     config_set_parser.add_argument("key")
     config_set_parser.add_argument("value")
-    subcommands.add_parser("doctor", help="Check local Runewall health.")
+    doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
+    doctor_parser.add_argument("--json", action="store_true", dest="json_output")
     pending_parser = subcommands.add_parser("pending", help="Show pending actions.")
     pending_parser.add_argument("--json", action="store_true", dest="json_output")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
@@ -431,6 +432,29 @@ def main(argv: list[str] | None = None) -> int:
         config_exists = config_path(Path.cwd()).exists()
         allow_execute = load_config(Path.cwd()).maps.allow_execute
 
+        if not httpx_available or not bs4_available:
+            summary = "FAIL"
+        elif not db_exists or not github_token_set or allow_execute:
+            summary = "WARN"
+        else:
+            summary = "OK"
+
+        if args.json_output:
+            print(json.dumps({
+                "python": {"version": sys.version.split()[0], "ok": True},
+                "database": {"present": db_exists, "path": str(database_path(Path.cwd()))},
+                "config": {
+                    "present": config_exists,
+                    "path": str(config_path(Path.cwd()).resolve()),
+                    "map_execution": "ENABLED" if allow_execute else "disabled",
+                },
+                "dependencies": {"httpx": httpx_available, "bs4": bs4_available},
+                "auth": {"github_token": "present" if github_token_set else "missing"},
+                "maps": {"bundled_count": maps_count},
+                "summary": summary,
+            }))
+            return 0
+
         print(f"Python: {sys.version.split()[0]}")
         print(f"Runewall DB: {'present' if db_exists else 'missing'}")
         print(f"Config: {'present' if config_exists else 'missing'}")
@@ -439,13 +463,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"GITHUB_TOKEN: {'set' if github_token_set else 'missing'}")
         print(f"Bundled maps: {maps_count}")
         print(f"Map execution: {'ENABLED' if allow_execute else 'disabled'}")
-
-        if not httpx_available or not bs4_available:
-            print("Summary: FAIL")
-        elif not db_exists or not github_token_set or allow_execute:
-            print("Summary: WARN")
-        else:
-            print("Summary: OK")
+        print(f"Summary: {summary}")
         return 0
     if args.command == "pending":
         log = ActionLog.open_existing(root=Path.cwd())
