@@ -23,6 +23,27 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
             "Map execution is disabled by config. Set [maps] allow_execute = true to enable."
         )
 
+    if normalized_site == "vercel" and normalized_flow == "list_projects":
+        token = os.environ.get("VERCEL_TOKEN")
+        if not token:
+            raise MapExecutionError("VERCEL_TOKEN is required to execute vercel:list_projects.")
+        response = _httpx_get(
+            "https://api.vercel.com/v9/projects",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+        )
+        if response.status_code >= 400:
+            detail = _error_detail(response)
+            raise MapExecutionError(f"Vercel list_projects failed: {response.status_code} {detail}")
+        payload = response.json()
+        projects_raw = payload.get("projects", []) if isinstance(payload, dict) else []
+        projects = [
+            {k: v for k, v in p.items() if k in ("id", "name", "framework")}
+            for p in projects_raw
+            if isinstance(p, dict)
+        ]
+        return {"project_count": len(projects), "projects": projects}
+
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise MapExecutionError("GITHUB_TOKEN is required to execute github:create_issue.")
@@ -55,13 +76,19 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
 
 
 def _is_supported_execution(site: str, flow: str) -> bool:
-    return site == "github" and flow == "create_issue"
+    return (site == "github" and flow == "create_issue") or (site == "vercel" and flow == "list_projects")
 
 
 def _httpx_post(*args: Any, **kwargs: Any) -> Any:
     import httpx
 
     return httpx.post(*args, **kwargs)
+
+
+def _httpx_get(*args: Any, **kwargs: Any) -> Any:
+    import httpx
+
+    return httpx.get(*args, **kwargs)
 
 
 def _error_detail(response: Any) -> str:

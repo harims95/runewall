@@ -342,11 +342,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("Runewall is not initialized; execution was not logged.")
 
-        print(f"Created GitHub issue for {inputs['repo']}.")
-        if "issue_number" in result:
-            print(f"Issue number: {result['issue_number']}")
-        if "issue_url" in result:
-            print(f"Issue URL: {result['issue_url']}")
+        if args.site.lower() == "vercel":
+            print(f"Listed {result['project_count']} Vercel project(s).")
+        else:
+            print(f"Created GitHub issue for {inputs['repo']}.")
+            if "issue_number" in result:
+                print(f"Issue number: {result['issue_number']}")
+            if "issue_url" in result:
+                print(f"Issue URL: {result['issue_url']}")
         return 0
     if args.command == "maps":
         registry = SiteMapRegistry()
@@ -502,7 +505,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.maps_command == "stats":
             site_maps = registry.list_maps()
-            real_execution_keys = {"github"}
+            real_execution_keys = {"github", "vercel"}
             total_maps = len(site_maps)
             total_flows = sum(len(sm.flows) for sm in site_maps)
             categories: dict[str, int] = {}

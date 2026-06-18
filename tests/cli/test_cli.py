@@ -1400,8 +1400,8 @@ class CliTests(unittest.TestCase):
                     exit_code = main(
                         [
                             "act",
-                            "vercel",
-                            "list_projects",
+                            "netlify",
+                            "list_sites",
                             "--execute",
                         ]
                     )
@@ -1409,7 +1409,7 @@ class CliTests(unittest.TestCase):
                 os.chdir(original_cwd)
 
         self.assertEqual(exit_code, 1)
-        self.assertEqual(output.getvalue().strip(), "Execution is not supported for vercel:list_projects.")
+        self.assertEqual(output.getvalue().strip(), "Execution is not supported for netlify:list_sites.")
 
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3199,9 +3199,11 @@ class CliTests(unittest.TestCase):
             main(["maps", "stats", "--json"])
         import json as _json
         data = _json.loads(output.getvalue())
-        for key in ("slack", "discord", "vercel", "netlify", "cloudflare", "linear", "supabase"):
+        for key in ("slack", "discord", "netlify", "cloudflare", "linear", "supabase"):
             self.assertIn(key, data["dry_run_only_maps"])
             self.assertNotIn(key, data["real_execution_maps"])
+        self.assertIn("vercel", data["real_execution_maps"])
+        self.assertNotIn("vercel", data["dry_run_only_maps"])
 
     def test_maps_list_human_still_works_with_category_and_tags(self) -> None:
         output = io.StringIO()
