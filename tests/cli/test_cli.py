@@ -2975,6 +2975,69 @@ class CliTests(unittest.TestCase):
         self.assertIn("github (GitHub)\tOK", output.getvalue())
         self.assertIn("slack (Slack)\tOK", output.getvalue())
 
+    def test_maps_stats_prints_total_maps_and_flows(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "stats"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Total maps:", rendered)
+        self.assertIn("Total flows:", rendered)
+        self.assertIn("Real execution:", rendered)
+        self.assertIn("Dry-run only:", rendered)
+
+    def test_maps_stats_includes_categories(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "stats"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Categories:", rendered)
+        self.assertIn("communication:", rendered)
+        self.assertIn("deployment:", rendered)
+
+    def test_maps_stats_json_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "stats", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("total_maps", data)
+        self.assertIn("total_flows", data)
+        self.assertIn("categories", data)
+        self.assertIn("real_execution_maps", data)
+        self.assertIn("dry_run_only_maps", data)
+
+    def test_maps_stats_json_includes_total_maps_and_flows(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertGreaterEqual(data["total_maps"], 8)
+        self.assertGreaterEqual(data["total_flows"], 8)
+        self.assertIsInstance(data["categories"], dict)
+
+    def test_maps_stats_json_includes_github_in_real_execution(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("github", data["real_execution_maps"])
+        self.assertNotIn("github", data["dry_run_only_maps"])
+
+    def test_maps_stats_json_includes_dry_run_only_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        for key in ("slack", "discord", "vercel", "netlify", "cloudflare", "linear", "supabase"):
+            self.assertIn(key, data["dry_run_only_maps"])
+            self.assertNotIn(key, data["real_execution_maps"])
+
     def test_maps_list_human_still_works_with_category_and_tags(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

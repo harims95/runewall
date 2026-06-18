@@ -49,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     maps_search_parser = maps_subcommands.add_parser("search", help="Search bundled site maps.")
     maps_search_parser.add_argument("query")
     maps_search_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_stats_parser = maps_subcommands.add_parser("stats", help="Show map statistics.")
+    maps_stats_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_subcommands.add_parser("path", help="Show the bundled site maps directory.")
     maps_validate_parser = maps_subcommands.add_parser("validate", help="Validate bundled site maps.")
     maps_validate_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -408,6 +410,37 @@ def main(argv: list[str] | None = None) -> int:
             print("site_name\tbase_url\tflows")
             for sm in results:
                 print("\t".join([sm.site_name, sm.base_url, str(len(sm.flows))]))
+            return 0
+        if args.maps_command == "stats":
+            site_maps = registry.list_maps()
+            real_execution_keys = {"github"}
+            total_maps = len(site_maps)
+            total_flows = sum(len(sm.flows) for sm in site_maps)
+            categories: dict[str, int] = {}
+            for sm in site_maps:
+                if sm.category:
+                    categories[sm.category] = categories.get(sm.category, 0) + 1
+            keys = [sm.raw.get("_filename", "").removesuffix(".json") for sm in site_maps]
+            real_execution_maps = sorted(k for k in keys if k in real_execution_keys)
+            dry_run_only_maps = sorted(k for k in keys if k not in real_execution_keys)
+
+            if args.json_output:
+                print(json.dumps({
+                    "total_maps": total_maps,
+                    "total_flows": total_flows,
+                    "categories": categories,
+                    "real_execution_maps": real_execution_maps,
+                    "dry_run_only_maps": dry_run_only_maps,
+                }))
+                return 0
+
+            print(f"Total maps: {total_maps}")
+            print(f"Total flows: {total_flows}")
+            print("Categories:")
+            for cat, count in sorted(categories.items()):
+                print(f"  {cat}: {count}")
+            print(f"Real execution: {', '.join(real_execution_maps) if real_execution_maps else 'none'}")
+            print(f"Dry-run only: {', '.join(dry_run_only_maps)}")
             return 0
         if args.maps_command == "path":
             maps_path = registry.bundled_maps_path()
