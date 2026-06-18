@@ -299,12 +299,12 @@ Currently bundled maps:
 | Discord | `send_message` | dry-run only |
 | GitHub | `create_issue` | dry-run + real API |
 | Linear | `create_issue` | dry-run only |
-| Netlify | `list_sites` | dry-run only |
+| Netlify | `list_sites` | dry-run + real API |
 | Slack | `send_message` | dry-run only |
-| Supabase | `list_projects` | dry-run only |
+| Supabase | `list_projects` | dry-run + real API |
 | Vercel | `list_projects` | dry-run + real API |
 
-`GitHub create_issue` and `Vercel list_projects` have real API execution. All other maps are dry-run and planning only.
+`GitHub`, `Netlify`, `Supabase`, and `Vercel` maps have real API execution. `Cloudflare`, `Discord`, `Linear`, and `Slack` are dry-run and planning only.
 
 Real execution is disabled by default. To enable it:
 
@@ -456,35 +456,57 @@ The config is local-first. It is never uploaded or sent anywhere.
 
 ## Real map execution
 
-Two bundled maps support real API execution:
+Four bundled maps support real API execution. All others are dry-run and planning only.
 
-**GitHub create_issue** — uses the GitHub REST API.
+Real execution is disabled by default. Enable it:
 
-Requires `GITHUB_TOKEN` in the environment.
+```bash
+runewall config set maps.allow_execute true
+```
+
+Disable again when done:
+
+```bash
+runewall config set maps.allow_execute false
+```
+
+Each map requires its own token in the environment. Tokens are read only from environment variables and are never printed, stored in config, or written to the action log. Dry-run never requires tokens and never calls external APIs.
+
+**GitHub create_issue** — requires `GITHUB_TOKEN`
 
 ```bash
 set GITHUB_TOKEN=your_token_here
-
 runewall act github create_issue --execute --input repo=user/repo --input title="Bug" --input body="Details"
 ```
 
-**Vercel list_projects** — uses the Vercel REST API.
-
-Requires `VERCEL_TOKEN` in the environment.
+**Vercel list_projects** — requires `VERCEL_TOKEN`
 
 ```bash
 set VERCEL_TOKEN=your_token_here
-
 runewall act vercel list_projects --execute
 ```
 
-Both require `allow_execute = true` in `.runewall/config.toml`. See [Local config](#local-config).
+**Netlify list_sites** — requires `NETLIFY_TOKEN`
+
+```bash
+set NETLIFY_TOKEN=your_token_here
+runewall act netlify list_sites --execute
+```
+
+**Supabase list_projects** — requires `SUPABASE_ACCESS_TOKEN`
+
+```bash
+set SUPABASE_ACCESS_TOKEN=your_token_here
+runewall act supabase list_projects --execute
+```
+
+All require `allow_execute = true` in `.runewall/config.toml`. See [Local config](#local-config).
 
 If Runewall is initialized, execution is logged as `map.execute`.
 
 If a token is missing, execution fails with a clear error and nothing is sent to the external service.
 
-Tokens are read only from environment variables. They are never printed, stored in config, or written to the action log.
+`runewall maps stats` shows which maps have real execution support and which are dry-run only.
 
 Tests use mocks. Do not use real tokens unless you intentionally want to call the external API.
 
@@ -497,9 +519,11 @@ It checks:
 - Python version
 - whether `.runewall/runewall.db` exists
 - whether required dependencies like `httpx` and `bs4` are installed
-- whether `GITHUB_TOKEN` and `VERCEL_TOKEN` are set without printing their values
+- whether `GITHUB_TOKEN`, `VERCEL_TOKEN`, `NETLIFY_TOKEN`, and `SUPABASE_ACCESS_TOKEN` are set without printing their values
 - bundled maps count
 - a final `OK`, `WARN`, or `FAIL` summary
+
+`runewall maps stats` shows a breakdown of real-execution maps vs dry-run-only maps.
 
 ## Agent-readable JSON output
 
