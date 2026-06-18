@@ -3,7 +3,9 @@
   "site": {
     "name": "Linear",
     "base_url": "https://linear.app",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "project_management",
+    "tags": ["issues", "tasks"]
   },
   "flows": {
     "create_issue": {

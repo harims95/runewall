@@ -3,7 +3,9 @@
   "site": {
     "name": "Cloudflare",
     "base_url": "https://dash.cloudflare.com",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "infrastructure",
+    "tags": ["dns", "infra", "cloud"]
   },
   "flows": {
     "list_zones": {

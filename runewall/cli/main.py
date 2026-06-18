@@ -347,6 +347,8 @@ def main(argv: list[str] | None = None) -> int:
                             "key": site_map.raw.get("_filename", "").removesuffix(".json"),
                             "site_name": site_map.site_name,
                             "base_url": site_map.base_url,
+                            "category": site_map.category,
+                            "tags": site_map.tags,
                             "flow_count": len(site_map.flows),
                             "flows": list(site_map.flows.keys()),
                         }
@@ -433,6 +435,8 @@ def main(argv: list[str] | None = None) -> int:
                     "base_url": site_map.base_url,
                     "map_version": site_map.map_version,
                     "schema_version": site_map.schema_version,
+                    "category": site_map.category,
+                    "tags": site_map.tags,
                     "flows": flows_json,
                 }))
                 return 0
@@ -441,6 +445,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Base URL: {site_map.base_url}")
             print(f"Map version: {site_map.map_version}")
             print(f"Schema version: {site_map.schema_version}")
+            if site_map.category:
+                print(f"Category: {site_map.category}")
+            if site_map.tags:
+                print(f"Tags: {', '.join(site_map.tags)}")
             print("Available flows:")
             for flow_name, flow_data in site_map.flows.items():
                 required_inputs = [

@@ -3,7 +3,9 @@
   "site": {
     "name": "Supabase",
     "base_url": "https://supabase.com",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "backend",
+    "tags": ["database", "backend"]
   },
   "flows": {
     "list_projects": {

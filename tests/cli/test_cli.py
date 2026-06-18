@@ -2935,5 +2935,56 @@ class CliTests(unittest.TestCase):
         self.assertIn("github (GitHub)\tOK", validate_output.getvalue())
 
 
+    def test_maps_list_json_includes_category_and_tags(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "list", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        github_entry = next(e for e in data["maps"] if e["key"] == "github")
+        self.assertEqual(github_entry["category"], "development")
+        self.assertEqual(github_entry["tags"], ["code", "issues"])
+        for entry in data["maps"]:
+            self.assertIn("category", entry)
+            self.assertIn("tags", entry)
+
+    def test_maps_show_json_github_includes_category_and_tags(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "github", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["category"], "development")
+        self.assertEqual(data["tags"], ["code", "issues"])
+
+    def test_maps_show_human_includes_category_and_tags(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "github"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Category: development", rendered)
+        self.assertIn("Tags: code, issues", rendered)
+
+    def test_maps_validate_still_passes_with_category_and_tags(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("github (GitHub)\tOK", output.getvalue())
+        self.assertIn("slack (Slack)\tOK", output.getvalue())
+
+    def test_maps_list_human_still_works_with_category_and_tags(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("site_name\tbase_url\tflows", rendered)
+        self.assertIn("GitHub", rendered)
+        self.assertIn("Slack", rendered)
+
+
 if __name__ == "__main__":
     unittest.main()

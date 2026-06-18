@@ -3,7 +3,9 @@
   "site": {
     "name": "GitHub",
     "base_url": "https://github.com",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "development",
+    "tags": ["code", "issues"]
   },
   "flows": {
     "create_issue": {

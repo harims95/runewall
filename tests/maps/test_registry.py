@@ -69,6 +69,36 @@ class SiteMapRegistryTests(unittest.TestCase):
             f"{invalid_path}: missing required field 'schema_version'",
         )
 
+    def test_registry_loads_category_and_tags_for_github(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_map("github.json")
+
+        self.assertEqual(site_map.category, "development")
+        self.assertEqual(site_map.tags, ["code", "issues"])
+
+    def test_registry_loads_category_and_tags_for_slack(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_map("slack.json")
+
+        self.assertEqual(site_map.category, "communication")
+        self.assertEqual(site_map.tags, ["team", "chat"])
+
+    def test_registry_returns_empty_category_and_tags_when_missing(self) -> None:
+        registry = SiteMapRegistry()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            no_meta_path = Path(temp_dir) / "nometa.json"
+            no_meta_path.write_text(
+                '{"schema_version":"1.0.0","site":{"name":"NoMeta","base_url":"https://example.com","map_version":"0.1.0"},"flows":{}}',
+                encoding="utf-8",
+            )
+            site_map = registry.load_file(no_meta_path)
+
+        self.assertEqual(site_map.category, "")
+        self.assertEqual(site_map.tags, [])
+
     def test_load_site_by_key_returns_github(self) -> None:
         registry = SiteMapRegistry()
 

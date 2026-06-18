@@ -3,7 +3,9 @@
   "site": {
     "name": "Vercel",
     "base_url": "https://vercel.com",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "deployment",
+    "tags": ["hosting", "deploy"]
   },
   "flows": {
     "list_projects": {

@@ -57,7 +57,9 @@ Every map file follows this structure:
   "site": {
     "name": "...",
     "base_url": "...",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "...",
+    "tags": ["...", "..."]
   },
   "flows": {
     "flow_name": {
@@ -76,6 +78,17 @@ Every map file follows this structure:
 | `map_version` | The version of this specific map, e.g. `"0.1.0"` |
 
 `schema_version` is always `"1.0.0"` for now.
+
+### Optional site metadata
+
+| Field | Type | Description |
+|---|---|---|
+| `category` | string | Broad grouping for discovery, e.g. `"deployment"`, `"communication"`, `"development"` |
+| `tags` | array of strings | Keywords that help agents find relevant maps, e.g. `["chat", "team"]` |
+
+Maps without `category` or `tags` are still valid. Adding them helps agents and tooling discover the right map for a task.
+
+Current categories in use: `backend`, `communication`, `deployment`, `development`, `infrastructure`, `project_management`.
 
 ### Required flow fields
 

@@ -27,6 +27,8 @@ class SiteMap:
     map_version: str
     flows: dict[str, Any]
     raw: dict[str, Any]
+    category: str
+    tags: list[str]
 
 
 @dataclass(frozen=True)
@@ -121,6 +123,8 @@ class SiteMapRegistry:
         base_url = self._require_str(site, "base_url", source=source)
         map_version = self._require_str(site, "map_version", source=source)
         flows = self._require_dict(data, "flows", source=source)
+        category = str(site.get("category", ""))
+        tags = [str(t) for t in site.get("tags", []) if isinstance(t, str)]
         return SiteMap(
             schema_version=schema_version,
             site_name=site_name,
@@ -128,6 +132,8 @@ class SiteMapRegistry:
             map_version=map_version,
             flows=flows,
             raw={**data, "_filename": source},
+            category=category,
+            tags=tags,
         )
 
     def _require_dict(self, data: dict[str, Any], key: str, *, source: str) -> dict[str, Any]:

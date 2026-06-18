@@ -3,7 +3,9 @@
   "site": {
     "name": "Discord",
     "base_url": "https://discord.com",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "communication",
+    "tags": ["community", "chat"]
   },
   "flows": {
     "send_message": {

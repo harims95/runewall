@@ -3,7 +3,9 @@
   "site": {
     "name": "Slack",
     "base_url": "https://slack.com",
-    "map_version": "0.1.0"
+    "map_version": "0.1.0",
+    "category": "communication",
+    "tags": ["team", "chat"]
   },
   "flows": {
     "send_message": {
