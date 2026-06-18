@@ -2975,6 +2975,54 @@ class CliTests(unittest.TestCase):
         self.assertIn("github (GitHub)\tOK", output.getvalue())
         self.assertIn("slack (Slack)\tOK", output.getvalue())
 
+    def test_maps_lint_runs_successfully_on_bundled_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "lint"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Map lint results", output.getvalue())
+
+    def test_maps_lint_reports_warnings_for_github(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "lint"])
+        rendered = output.getvalue()
+        self.assertIn("github", rendered)
+        self.assertIn("description is empty", rendered)
+
+    def test_maps_lint_json_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "lint", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("ok", data)
+        self.assertIn("warning_count", data)
+        self.assertIn("error_count", data)
+        self.assertIn("results", data)
+
+    def test_maps_lint_json_includes_warning_and_error_counts(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "lint", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["error_count"], 0)
+        self.assertGreaterEqual(data["warning_count"], 1)
+        github_result = next(r for r in data["results"] if r["key"] == "github")
+        self.assertIsInstance(github_result["warnings"], list)
+        self.assertIsInstance(github_result["errors"], list)
+        self.assertTrue(any("description is empty" in w for w in github_result["warnings"]))
+
+    def test_maps_validate_still_works_alongside_lint(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("github (GitHub)\tOK", output.getvalue())
+
     def test_maps_export_json_prints_valid_json(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

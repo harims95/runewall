@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.maps import MapValidationError, SiteMapRegistry
-from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
+from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
 class SiteMapRegistryTests(unittest.TestCase):
@@ -123,6 +123,38 @@ class SiteMapRegistryTests(unittest.TestCase):
         results = registry.search_maps("xyznotfound")
 
         self.assertEqual(results, [])
+
+    def test_lint_map_detects_invalid_risk_level_as_error(self) -> None:
+        site_map = SiteMap(
+            schema_version="1.0.0",
+            site_name="Test",
+            base_url="https://test.com",
+            map_version="0.1.0",
+            flows={"bad_flow": {"risk_level": "critical", "reversible": False}},
+            raw={"site": {"tags": ["t"]}, "_filename": "test.json"},
+            category="test",
+            tags=["t"],
+        )
+
+        _warnings, errors = lint_map(site_map)
+
+        self.assertTrue(any("invalid risk_level" in e for e in errors))
+
+    def test_lint_map_detects_tags_not_list_as_error(self) -> None:
+        site_map = SiteMap(
+            schema_version="1.0.0",
+            site_name="Test",
+            base_url="https://test.com",
+            map_version="0.1.0",
+            flows={},
+            raw={"site": {"tags": "not-a-list"}, "_filename": "test.json"},
+            category="test",
+            tags=[],
+        )
+
+        _warnings, errors = lint_map(site_map)
+
+        self.assertIn("tags is not a list", errors)
 
     def test_load_site_by_key_returns_github(self) -> None:
         registry = SiteMapRegistry()

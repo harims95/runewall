@@ -14,6 +14,7 @@ from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
 from runewall.maps.executor import MapExecutionError, UnsupportedExecutionError, execute_map_action
 from runewall.maps import SiteMapRegistry
+from runewall.maps.registry import lint_map
 from runewall.maps.planner import DryRunPlanner, dry_run_result, missing_inputs_error, render_plan
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
 from runewall.core.models import Action
@@ -49,6 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
     maps_search_parser = maps_subcommands.add_parser("search", help="Search bundled site maps.")
     maps_search_parser.add_argument("query")
     maps_search_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_lint_parser = maps_subcommands.add_parser("lint", help="Lint bundled maps for quality warnings.")
+    maps_lint_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_export_parser = maps_subcommands.add_parser("export", help="Export all bundled maps as JSON.")
     maps_export_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_stats_parser = maps_subcommands.add_parser("stats", help="Show map statistics.")
@@ -413,6 +416,48 @@ def main(argv: list[str] | None = None) -> int:
             for sm in results:
                 print("\t".join([sm.site_name, sm.base_url, str(len(sm.flows))]))
             return 0
+        if args.maps_command == "lint":
+            site_maps = registry.list_maps()
+            lint_results = []
+            total_warnings = 0
+            total_errors = 0
+            for site_map in site_maps:
+                key = site_map.raw.get("_filename", "").removesuffix(".json")
+                warnings, errors = lint_map(site_map)
+                total_warnings += len(warnings)
+                total_errors += len(errors)
+                lint_results.append((key, site_map.site_name, warnings, errors))
+
+            has_errors = total_errors > 0
+
+            if args.json_output:
+                print(json.dumps({
+                    "ok": not has_errors,
+                    "warning_count": total_warnings,
+                    "error_count": total_errors,
+                    "results": [
+                        {
+                            "key": key,
+                            "site_name": site_name,
+                            "warnings": warnings,
+                            "errors": errors,
+                        }
+                        for key, site_name, warnings, errors in lint_results
+                    ],
+                }))
+                return 0 if not has_errors else 1
+
+            print("Map lint results")
+            for key, _site_name, warnings, errors in lint_results:
+                issues = warnings + errors
+                if not issues:
+                    print(f"{key}: OK")
+                else:
+                    label = "ERROR" if errors else "WARN"
+                    print(f"{key}: {label}")
+                    for issue in issues:
+                        print(f"  - {issue}")
+            return 0 if not has_errors else 1
         if args.maps_command == "export":
             if not args.json_output:
                 print("Use `runewall maps export --json` to export the map registry.")

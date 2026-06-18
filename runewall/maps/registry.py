@@ -39,6 +39,49 @@ class MapValidationResult:
     error: str | None = None
 
 
+_VALID_RISK_LEVELS = {"low", "medium", "high"}
+
+
+def lint_map(site_map: SiteMap) -> tuple[list[str], list[str]]:
+    """Return (warnings, errors) for quality issues in a site map."""
+    warnings: list[str] = []
+    errors: list[str] = []
+
+    raw_tags = site_map.raw.get("site", {}).get("tags")
+    if raw_tags is not None and not isinstance(raw_tags, list):
+        errors.append("tags is not a list")
+    elif not site_map.tags:
+        warnings.append("map tags are empty")
+
+    if not site_map.category:
+        warnings.append("category is missing")
+
+    for flow_name, flow_data in site_map.flows.items():
+        description = str(flow_data.get("description", ""))
+        risk_level = str(flow_data.get("risk_level", ""))
+        reversible = bool(flow_data.get("reversible", False))
+        requires_auth = bool(flow_data.get("requires_auth", False))
+        api_path = flow_data.get("api_path")
+
+        if not description.strip():
+            warnings.append(f"{flow_name}: description is empty")
+
+        if risk_level not in _VALID_RISK_LEVELS:
+            errors.append(f"{flow_name}: invalid risk_level: {risk_level!r}")
+
+        if requires_auth and api_path is None:
+            warnings.append(f"{flow_name}: requires_auth true but api_path is missing")
+
+        if risk_level in ("medium", "high") and not reversible:
+            warnings.append(f"{flow_name}: risk_level {risk_level} but reversible is false")
+
+        if api_path is not None:
+            if not isinstance(api_path, dict) or not api_path.get("method") or not api_path.get("url"):
+                warnings.append(f"{flow_name}: api_path exists but method or url is missing")
+
+    return warnings, errors
+
+
 class SiteMapRegistry:
     """Loads bundled JSON site maps from runewall.maps.sites."""
 
