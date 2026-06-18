@@ -11,7 +11,9 @@ All other commands that support `--json` are documented in the main README.
 - `--json` prints valid JSON only. Nothing else is written to stdout.
 - Token values are never printed, stored, or logged in any mode.
 - Dry-run never calls external APIs. It only reads the map and builds a plan.
-- Real execution is disabled by default.
+- Real execution is disabled by default by `maps.allow_execute`.
+- Dry-run and execute JSON include policy fields so agents can explain the effective decision.
+- A `block` policy prevents execute before any external API call is made.
 
 Enable real execution:
 
@@ -24,6 +26,35 @@ Disable again:
 ```bash
 runewall config set maps.allow_execute false
 ```
+
+---
+
+## Policy fields
+
+These fields are included in dry-run JSON success responses, execute JSON success responses, and execute JSON error responses when the policy can be resolved:
+
+- `policy`: the effective policy for the action type
+- `decision`: the effective decision label derived from the policy
+- `policy_source`: where the policy came from
+- `policy_reason`: a short explanation of the match
+
+### Policy values
+
+| Value | Meaning |
+|---|---|
+| `auto` | Runewall would allow the action automatically |
+| `snapshot` | Runewall would require a snapshot before action |
+| `review` | Runewall would require human review |
+| `block` | Runewall would block the action |
+
+### Decision values
+
+| Value | Meaning |
+|---|---|
+| `allow` | Action is allowed |
+| `snapshot_required` | Snapshot is required before action |
+| `review_required` | Human review is required |
+| `blocked` | Action is blocked |
 
 ---
 
@@ -47,21 +78,24 @@ runewall act SITE FLOW --dry-run --json --input key=value
   "requires_auth": true,
   "provided_inputs": {
     "repo": "user/repo",
-    "title": "Bug report",
-    "body": "Details"
+    "title": "Test issue"
   },
   "missing_inputs": [],
   "api_path": {
     "method": "POST",
     "url": "/repos/{repo}/issues"
   },
-  "ui_steps_count": 0
+  "ui_steps_count": 0,
+  "policy": "auto",
+  "decision": "allow",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_dry_run = \"auto\""
 }
 ```
 
 `executed` is always `false` for dry-run. No external API is called.
 
-### Error — missing required input
+### Error - missing required input
 
 ```json
 {
@@ -74,7 +108,7 @@ runewall act SITE FLOW --dry-run --json --input key=value
 }
 ```
 
-### Error — unknown site
+### Error - unknown site
 
 ```json
 {
@@ -87,7 +121,7 @@ runewall act SITE FLOW --dry-run --json --input key=value
 }
 ```
 
-### Error — unknown flow
+### Error - unknown flow
 
 ```json
 {
@@ -108,7 +142,7 @@ runewall act SITE FLOW --dry-run --json --input key=value
 runewall act SITE FLOW --execute --json
 ```
 
-### Success — GitHub create_issue
+### Success
 
 ```json
 {
@@ -119,79 +153,15 @@ runewall act SITE FLOW --execute --json
   "result": {
     "issue_url": "https://github.com/user/repo/issues/1",
     "issue_number": 1
-  }
+  },
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
 }
 ```
 
-### Success — Cloudflare list_zones
-
-```json
-{
-  "ok": true,
-  "executed": true,
-  "site": "cloudflare",
-  "flow": "list_zones",
-  "result": {
-    "zone_count": 2,
-    "zones": [
-      { "id": "zone_1", "name": "example.com", "status": "active", "type": "full" }
-    ]
-  }
-}
-```
-
-### Success — Vercel list_projects
-
-```json
-{
-  "ok": true,
-  "executed": true,
-  "site": "vercel",
-  "flow": "list_projects",
-  "result": {
-    "project_count": 2,
-    "projects": [
-      { "id": "proj_1", "name": "my-app", "framework": "nextjs" }
-    ]
-  }
-}
-```
-
-### Success — Netlify list_sites
-
-```json
-{
-  "ok": true,
-  "executed": true,
-  "site": "netlify",
-  "flow": "list_sites",
-  "result": {
-    "site_count": 1,
-    "sites": [
-      { "id": "site_1", "name": "my-site", "url": "https://my-site.netlify.app" }
-    ]
-  }
-}
-```
-
-### Success — Supabase list_projects
-
-```json
-{
-  "ok": true,
-  "executed": true,
-  "site": "supabase",
-  "flow": "list_projects",
-  "result": {
-    "project_count": 1,
-    "projects": [
-      { "id": "proj_1", "name": "my-db", "region": "us-east-1", "status": "ACTIVE_HEALTHY" }
-    ]
-  }
-}
-```
-
-### Error — execution blocked by config
+### Error - execution blocked by config
 
 ```json
 {
@@ -200,11 +170,15 @@ runewall act SITE FLOW --execute --json
   "site": "vercel",
   "flow": "list_projects",
   "error": "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
-  "error_code": "EXECUTION_DISABLED"
+  "error_code": "EXECUTION_DISABLED",
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
 }
 ```
 
-### Error — missing token
+### Error - missing token
 
 ```json
 {
@@ -213,11 +187,15 @@ runewall act SITE FLOW --execute --json
   "site": "vercel",
   "flow": "list_projects",
   "error": "VERCEL_TOKEN is required to execute vercel:list_projects.",
-  "error_code": "MISSING_TOKEN"
+  "error_code": "MISSING_TOKEN",
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
 }
 ```
 
-### Error — unsupported execution
+### Error - unsupported execution
 
 ```json
 {
@@ -226,11 +204,15 @@ runewall act SITE FLOW --execute --json
   "site": "slack",
   "flow": "send_message",
   "error": "Execution is not supported for slack:send_message.",
-  "error_code": "UNSUPPORTED_EXECUTION"
+  "error_code": "UNSUPPORTED_EXECUTION",
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
 }
 ```
 
-### Error — API failure
+### Error - API failure
 
 ```json
 {
@@ -239,7 +221,28 @@ runewall act SITE FLOW --execute --json
   "site": "vercel",
   "flow": "list_projects",
   "error": "Vercel list_projects failed: 401 Unauthorized",
-  "error_code": "API_ERROR"
+  "error_code": "API_ERROR",
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
+}
+```
+
+### Error - blocked by policy before external execution
+
+```json
+{
+  "ok": false,
+  "executed": false,
+  "site": "vercel",
+  "flow": "list_projects",
+  "error": "Execution blocked by policy for map.execute.",
+  "error_code": "POLICY_BLOCKED",
+  "policy": "block",
+  "decision": "blocked",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"block\""
 }
 ```
 
@@ -253,6 +256,7 @@ runewall act SITE FLOW --execute --json
 | `MISSING_TOKEN` | Required environment variable is not set |
 | `UNSUPPORTED_EXECUTION` | Real execution is not implemented for this site/flow |
 | `API_ERROR` | The external API returned a non-2xx response |
+| `POLICY_BLOCKED` | The effective `map.execute` policy is `block` |
 | `UNKNOWN_SITE` | The site key does not match any bundled map |
 | `UNKNOWN_FLOW` | The flow name does not exist in the site map |
 | `INVALID_INPUT` | One or more required inputs are missing |

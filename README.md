@@ -546,6 +546,7 @@ Key behaviors:
 - Human output remains unchanged when `--json` is not used.
 - Dry-run JSON never executes real actions. It only plans.
 - Real execution is still guarded by config (`maps.allow_execute`) and environment tokens.
+- Dry-run and execute JSON include policy fields so agents can explain the effective decision.
 - Token values are never printed in any mode.
 
 ### Supported commands
@@ -616,15 +617,35 @@ runewall act github create_issue --dry-run --json --input repo=user/repo --input
   "executed": false,
   "site": "github",
   "flow": "create_issue",
+  "description": "Create a GitHub issue",
   "risk_level": "low",
   "reversible": true,
   "requires_auth": true,
-  "provided_inputs": { "repo": "user/repo", "title": "Bug", "body": "Details" },
+  "provided_inputs": {
+    "repo": "user/repo",
+    "title": "Test issue"
+  },
   "missing_inputs": [],
-  "api_path": null,
-  "ui_steps_count": 0
+  "api_path": {
+    "method": "POST",
+    "url": "/repos/{repo}/issues"
+  },
+  "ui_steps_count": 0,
+  "policy": "auto",
+  "decision": "allow",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_dry_run = \"auto\""
 }
 ```
+
+The policy fields tell agents why the dry-run is allowed or constrained:
+
+- `policy`: `auto`, `snapshot`, `review`, or `block`
+- `decision`: `allow`, `snapshot_required`, `review_required`, or `blocked`
+- `policy_source`: where the policy came from
+- `policy_reason`: a short explanation of the match
+
+Dry-run still never calls external APIs.
 
 If required inputs are missing, `ok` is `false`, `error` describes what is missing, and `error_code` is `INVALID_INPUT`.
 
@@ -637,22 +658,73 @@ runewall act vercel list_projects --execute --json
 Success:
 
 ```json
-{ "ok": true, "executed": true, "site": "vercel", "flow": "list_projects", "result": { "project_count": 2, "projects": [...] } }
+{
+  "ok": true,
+  "executed": true,
+  "site": "vercel",
+  "flow": "list_projects",
+  "result": { "project_count": 2, "projects": [...] },
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
+}
 ```
 
 Error — blocked by config:
 
 ```json
-{ "ok": false, "executed": false, "site": "vercel", "flow": "list_projects", "error": "...", "error_code": "EXECUTION_DISABLED" }
+{
+  "ok": false,
+  "executed": false,
+  "site": "vercel",
+  "flow": "list_projects",
+  "error": "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+  "error_code": "EXECUTION_DISABLED",
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
+}
 ```
 
 Error — missing token:
 
 ```json
-{ "ok": false, "executed": false, "site": "vercel", "flow": "list_projects", "error": "...", "error_code": "MISSING_TOKEN" }
+{
+  "ok": false,
+  "executed": false,
+  "site": "vercel",
+  "flow": "list_projects",
+  "error": "...",
+  "error_code": "MISSING_TOKEN",
+  "policy": "review",
+  "decision": "review_required",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"review\""
+}
 ```
 
-Stable `error_code` values: `EXECUTION_DISABLED`, `MISSING_TOKEN`, `UNSUPPORTED_EXECUTION`, `API_ERROR`, `UNKNOWN_SITE`, `UNKNOWN_FLOW`, `INVALID_INPUT`.
+Error â€” blocked by policy before any external API call:
+
+```json
+{
+  "ok": false,
+  "executed": false,
+  "site": "vercel",
+  "flow": "list_projects",
+  "error": "Execution blocked by policy for map.execute.",
+  "error_code": "POLICY_BLOCKED",
+  "policy": "block",
+  "decision": "blocked",
+  "policy_source": "config_rule",
+  "policy_reason": "rules.map_execute = \"block\""
+}
+```
+
+`--execute` is still disabled by default by `maps.allow_execute`. A `block` policy prevents execute before any external API call is made.
+
+Stable `error_code` values: `EXECUTION_DISABLED`, `MISSING_TOKEN`, `UNSUPPORTED_EXECUTION`, `API_ERROR`, `POLICY_BLOCKED`, `UNKNOWN_SITE`, `UNKNOWN_FLOW`, `INVALID_INPUT`.
 
 See [docs/agent-json-schema.md](docs/agent-json-schema.md) for the full JSON schema reference including all shapes and error codes.
 
