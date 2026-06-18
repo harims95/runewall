@@ -619,9 +619,35 @@ runewall act github create_issue --dry-run --json --input repo=user/repo --input
 }
 ```
 
-If required inputs are missing, `ok` is `false`, `error` describes what is missing, and the exit code is non-zero.
+If required inputs are missing, `ok` is `false`, `error` describes what is missing, and `error_code` is `INVALID_INPUT`.
 
-`--json` is only valid with `--dry-run`. Using `--json` with `--execute` exits non-zero with a clear error.
+**Real execution JSON:**
+
+```bash
+runewall act vercel list_projects --execute --json
+```
+
+Success:
+
+```json
+{ "ok": true, "executed": true, "site": "vercel", "flow": "list_projects", "result": { "project_count": 2, "projects": [...] } }
+```
+
+Error — blocked by config:
+
+```json
+{ "ok": false, "executed": false, "site": "vercel", "flow": "list_projects", "error": "...", "error_code": "EXECUTION_DISABLED" }
+```
+
+Error — missing token:
+
+```json
+{ "ok": false, "executed": false, "site": "vercel", "flow": "list_projects", "error": "...", "error_code": "MISSING_TOKEN" }
+```
+
+Stable `error_code` values: `EXECUTION_DISABLED`, `MISSING_TOKEN`, `UNSUPPORTED_EXECUTION`, `API_ERROR`, `UNKNOWN_SITE`, `UNKNOWN_FLOW`, `INVALID_INPUT`.
+
+See [docs/agent-json-schema.md](docs/agent-json-schema.md) for the full JSON schema reference including all shapes and error codes.
 
 **Config:**
 
