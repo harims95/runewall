@@ -289,12 +289,24 @@ Returned fields:
 
 Runewall can load bundled site action maps without using browser automation.
 
+Dry-run never calls any external API. It only reads the map, validates inputs, and builds a plan.
+
 Currently bundled maps:
 
-- `GitHub`: `create_issue`
-- `Vercel`: `list_projects`
-- `Netlify`: `list_sites`
-- `Cloudflare`: `list_zones`
+| Site | Flow | Execution |
+|---|---|---|
+| Cloudflare | `list_zones` | dry-run only |
+| Discord | `send_message` | dry-run only |
+| GitHub | `create_issue` | dry-run + real API |
+| Linear | `create_issue` | dry-run only |
+| Netlify | `list_sites` | dry-run only |
+| Slack | `send_message` | dry-run only |
+| Supabase | `list_projects` | dry-run only |
+| Vercel | `list_projects` | dry-run only |
+
+Only `GitHub create_issue` has real API execution. All other maps are dry-run and planning only.
+
+Real execution is disabled by default. To enable it, set `maps.allow_execute = true` in config and provide the required token in the environment. Tokens and secrets are never stored in map files.
 
 List bundled maps with:
 
@@ -302,13 +314,11 @@ List bundled maps with:
 runewall maps list
 ```
 
-Inspect bundled maps with:
+Inspect a map with:
 
 ```bash
 runewall maps show github
-runewall maps show vercel
-runewall maps show netlify
-runewall maps show cloudflare
+runewall maps show slack
 runewall maps validate
 runewall maps path
 ```
@@ -322,10 +332,6 @@ runewall act github create_issue --dry-run --input repo=user/repo --input title=
 This dry-run does not call GitHub, does not open a browser, and does not mutate anything.
 
 If Runewall is initialized, the dry-run is logged as `map.dry_run`.
-
-Only `GitHub create_issue` has real API execution right now.
-
-`Vercel`, `Netlify`, and `Cloudflare` are dry-run and planning maps only for now.
 
 No browser automation is used for these maps.
 

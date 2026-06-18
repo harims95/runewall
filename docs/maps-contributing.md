@@ -31,11 +31,17 @@ runewall/maps/sites/
 Each map is a single JSON file named after the site key:
 
 ```
-runewall/maps/sites/github.json
-runewall/maps/sites/vercel.json
-runewall/maps/sites/netlify.json
 runewall/maps/sites/cloudflare.json
+runewall/maps/sites/discord.json
+runewall/maps/sites/github.json
+runewall/maps/sites/linear.json
+runewall/maps/sites/netlify.json
+runewall/maps/sites/slack.json
+runewall/maps/sites/supabase.json
+runewall/maps/sites/vercel.json
 ```
+
+Most maps are dry-run and planning only. Only `github.json` has real API execution currently. Tokens and secrets are never stored in map files.
 
 To add a new bundled map, create a new `.json` file in this directory.
 
