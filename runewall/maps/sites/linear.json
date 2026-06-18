@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0.0",
+  "site": {
+    "name": "Linear",
+    "base_url": "https://linear.app",
+    "map_version": "0.1.0"
+  },
+  "flows": {
+    "create_issue": {
+      "description": "Create a Linear issue",
+      "risk_level": "medium",
+      "reversible": false,
+      "requires_auth": true,
+      "inputs": {
+        "team_id": {
+          "type": "string",
+          "required": true
+        },
+        "title": {
+          "type": "string",
+          "required": true
+        },
+        "description": {
+          "type": "string",
+          "required": false
+        }
+      },
+      "api_path": {
+        "method": "POST",
+        "url": "/graphql"
+      }
+    }
+  }
+}

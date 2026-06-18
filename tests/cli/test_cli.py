@@ -322,6 +322,87 @@ class CliTests(unittest.TestCase):
         self.assertIn("requires_auth: True", rendered)
         self.assertIn("required inputs: none", rendered)
 
+    def test_maps_list_includes_linear(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Linear", rendered)
+        self.assertIn("https://linear.app", rendered)
+
+    def test_maps_show_linear_prints_create_issue(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "linear"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Linear", rendered)
+        self.assertIn("Base URL: https://linear.app", rendered)
+        self.assertIn("Map version: 0.1.0", rendered)
+        self.assertIn("Schema version: 1.0.0", rendered)
+        self.assertIn("- create_issue", rendered)
+        self.assertIn("risk_level: medium", rendered)
+        self.assertIn("reversible: False", rendered)
+        self.assertIn("requires_auth: True", rendered)
+        self.assertIn("required inputs: team_id, title", rendered)
+
+    def test_maps_validate_includes_linear_ok(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("linear (Linear)\tOK", rendered)
+
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_dry_run_for_linear_create_issue(self, mocked_execute) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "linear", "create_issue", "--dry-run",
+                        "--input", "team_id=team123",
+                        "--input", "title=Bug report",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Linear", rendered)
+        self.assertIn("Flow name: create_issue", rendered)
+        self.assertIn("Risk level: medium", rendered)
+        self.assertIn("Reversible: False", rendered)
+        self.assertIn("Requires auth: True", rendered)
+        self.assertIn("- team_id=team123", rendered)
+        self.assertIn("- title=Bug report", rendered)
+        self.assertIn("Missing inputs: none", rendered)
+        mocked_execute.assert_not_called()
+
+    def test_act_dry_run_json_for_linear_create_issue(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "linear", "create_issue", "--dry-run", "--json",
+                "--input", "team_id=team123",
+                "--input", "title=Bug report",
+            ])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "linear")
+        self.assertEqual(data["flow"], "create_issue")
+        self.assertEqual(data["risk_level"], "medium")
+        self.assertFalse(data["reversible"])
+        self.assertEqual(data["missing_inputs"], [])
+        self.assertEqual(data["api_path"], {"method": "POST", "url": "/graphql"})
+
     def test_maps_show_unknown_site_fails_clearly(self) -> None:
         output = io.StringIO()
 

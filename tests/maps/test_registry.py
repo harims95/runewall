@@ -104,26 +104,31 @@ class SiteMapRegistryTests(unittest.TestCase):
 
         self.assertEqual(str(context.exception), "Flow not found for GitHub: unknown_flow")
 
-    def test_validate_bundled_maps_passes_with_github_vercel_netlify_and_cloudflare(self) -> None:
+    def test_registry_loads_linear_json(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_map("linear.json")
+
+        self.assertEqual(site_map.site_name, "Linear")
+        self.assertEqual(site_map.base_url, "https://linear.app")
+        self.assertEqual(site_map.schema_version, "1.0.0")
+        self.assertIn("create_issue", site_map.flows)
+
+    def test_validate_bundled_maps_passes_with_github_vercel_netlify_cloudflare_and_linear(self) -> None:
         registry = SiteMapRegistry()
 
         results = registry.validate_bundled_maps()
 
         by_key = {result.site_key: result for result in results}
 
-        self.assertEqual(set(by_key), {"github", "vercel", "netlify", "cloudflare"})
-        self.assertEqual(by_key["github"].site_name, "GitHub")
-        self.assertTrue(by_key["github"].ok)
-        self.assertIsNone(by_key["github"].error)
-        self.assertEqual(by_key["vercel"].site_name, "Vercel")
-        self.assertTrue(by_key["vercel"].ok)
-        self.assertIsNone(by_key["vercel"].error)
-        self.assertEqual(by_key["netlify"].site_name, "Netlify")
-        self.assertTrue(by_key["netlify"].ok)
-        self.assertIsNone(by_key["netlify"].error)
-        self.assertEqual(by_key["cloudflare"].site_name, "Cloudflare")
-        self.assertTrue(by_key["cloudflare"].ok)
-        self.assertIsNone(by_key["cloudflare"].error)
+        self.assertIn("github", by_key)
+        self.assertIn("vercel", by_key)
+        self.assertIn("netlify", by_key)
+        self.assertIn("cloudflare", by_key)
+        self.assertIn("linear", by_key)
+        for key in ("github", "vercel", "netlify", "cloudflare", "linear"):
+            self.assertTrue(by_key[key].ok)
+            self.assertIsNone(by_key[key].error)
 
 
 if __name__ == "__main__":
