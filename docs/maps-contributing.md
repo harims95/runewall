@@ -198,6 +198,23 @@ runewall maps search deploy --json
 
 If nothing matches, count is 0 and maps is an empty array.
 
+Get a summary of the map registry:
+
+```bash
+runewall maps stats
+runewall maps stats --json
+```
+
+`maps stats` shows total maps, total flows, breakdown by category, maps with real execution support, and dry-run-only maps. Most bundled maps are dry-run only. Only `github create_issue` has real execution currently.
+
+Export the full registry for agents and tools that need all map data at once:
+
+```bash
+runewall maps export --json
+```
+
+This prints all maps as a single JSON object with site metadata, category, tags, and full flow details for every bundled map. Export never executes anything.
+
 Dry-run planning also never calls external APIs. It only reads the map, validates inputs, and shows a plan.
 
 ---
