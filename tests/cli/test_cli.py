@@ -1542,6 +1542,99 @@ class CliTests(unittest.TestCase):
             self.assertIn("Deleted 1 old snapshot(s).", output.getvalue())
 
 
+    def test_cleanup_snapshots_json_no_dir_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["cleanup", "snapshots", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["snapshots_directory_exists"])
+        self.assertEqual(data["deleted_count"], 0)
+        self.assertNotIn("retention_days", data)
+
+    def test_cleanup_snapshots_json_includes_retention_days_when_dir_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                snapshots_dir = Path.cwd() / ".runewall" / "snapshots"
+                snapshots_dir.mkdir(parents=True, exist_ok=True)
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["cleanup", "snapshots", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["snapshots_directory_exists"])
+        self.assertIn("retention_days", data)
+        self.assertEqual(data["retention_days"], 30)
+
+    def test_cleanup_snapshots_json_reports_deleted_count(self) -> None:
+        import os as _os
+        import time as _time
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                snapshots_dir = Path.cwd() / ".runewall" / "snapshots"
+                snapshots_dir.mkdir(parents=True, exist_ok=True)
+                old_snap = snapshots_dir / "old_snap"
+                old_snap.mkdir()
+                old_time = _time.time() - 31 * 86400
+                _os.utime(old_snap, (old_time, old_time))
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["cleanup", "snapshots", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["snapshots_directory_exists"])
+        self.assertEqual(data["deleted_count"], 1)
+        self.assertEqual(data["retention_days"], 30)
+
+    def test_cleanup_snapshots_human_output_unchanged_after_json_added(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["cleanup", "snapshots"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(output.getvalue().strip(), "No snapshots directory found.")
+
     def test_status_json_before_init_prints_valid_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

@@ -76,7 +76,8 @@ def build_parser() -> argparse.ArgumentParser:
     rollback_parser.add_argument("--last", action="store_true")
     cleanup_parser = subcommands.add_parser("cleanup", help="Clean up old Runewall data.")
     cleanup_subcommands = cleanup_parser.add_subparsers(dest="cleanup_command", required=True)
-    cleanup_subcommands.add_parser("snapshots", help="Delete snapshot directories older than retention period.")
+    cleanup_snapshots_parser = cleanup_subcommands.add_parser("snapshots", help="Delete snapshot directories older than retention period.")
+    cleanup_snapshots_parser.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -669,6 +670,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "cleanup":
         if args.cleanup_command == "snapshots":
             snapshots_dir = project_state_dir(Path.cwd()) / "snapshots"
+
+            if args.json_output:
+                if not snapshots_dir.is_dir():
+                    print(json.dumps({"ok": True, "snapshots_directory_exists": False, "deleted_count": 0}))
+                    return 0
+                retention_days = load_config(Path.cwd()).retention.snapshot_days
+                deleted = cleanup_snapshots(root=Path.cwd())
+                print(json.dumps({"ok": True, "snapshots_directory_exists": True, "deleted_count": deleted, "retention_days": retention_days}))
+                return 0
+
             if not snapshots_dir.is_dir():
                 print("No snapshots directory found.")
                 return 0
