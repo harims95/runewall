@@ -51,6 +51,7 @@ class CliTests(unittest.TestCase):
         rendered = output.getvalue()
         self.assertIn("Run local release readiness checks.", rendered)
         self.assertIn("check", rendered)
+        self.assertIn("json-check", rendered)
 
     def test_maps_help_exits_zero_and_mentions_lint(self) -> None:
         output = io.StringIO()
@@ -5098,6 +5099,57 @@ class CliTests(unittest.TestCase):
                 os.chdir(original_cwd)
         self.assertEqual(exit_code, 0)
         self.assertIn("Release check: OK", output.getvalue())
+
+    def test_release_json_check_exists(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "json-check"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("JSON contract check: OK", rendered)
+
+    def test_release_json_check_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "json-check", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["level"], "OK")
+        self.assertEqual(data["missing_fields"], [])
+        self.assertEqual(data["missing_error_codes"], [])
+        self.assertEqual(data["path"], "docs/agent-json-schema.md")
+
+    def test_release_json_check_reports_ok_when_docs_include_required_fields_and_codes(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "json-check"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn(
+            "docs/agent-json-schema.md includes required agent JSON fields and error codes.",
+            output.getvalue(),
+        )
+
+    def test_release_json_check_warns_when_agent_json_schema_doc_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["release", "json-check", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["level"], "WARN")
+        self.assertEqual(data["missing_fields"], [])
+        self.assertEqual(data["missing_error_codes"], [])
+        self.assertEqual(data["path"], "docs/agent-json-schema.md")
+        self.assertEqual(data["message"], "docs/agent-json-schema.md is missing.")
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     def test_release_check_json_returns_valid_json(self, mocked_find_spec) -> None:

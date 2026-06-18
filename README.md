@@ -555,6 +555,7 @@ runewall policy audit
 runewall maps lint --strict
 runewall doctor
 runewall release check
+runewall release json-check
 python -m pytest tests -v
 ```
 
@@ -566,6 +567,7 @@ What each step does:
 - `runewall maps lint --strict` checks bundled map quality and treats warnings as release blockers.
 - `runewall doctor` checks local runtime health.
 - `runewall release check` combines the main local release safety checks in one command.
+- `runewall release json-check` verifies that the agent-facing JSON contract docs include the required fields and stable error codes.
 - `python -m pytest tests -v` runs the test suite.
 
 Notes:

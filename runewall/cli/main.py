@@ -26,6 +26,27 @@ from runewall.translate import read_url
 
 EMPTY_LOG_MESSAGE = "No actions recorded yet."
 NOT_INITIALIZED_MESSAGE = "Runewall is not initialized. Run `runewall init` first."
+JSON_SCHEMA_DOC_PATH = Path("docs") / "agent-json-schema.md"
+REQUIRED_JSON_FIELDS = (
+    "ok",
+    "error",
+    "error_code",
+    "executed",
+    "policy",
+    "decision",
+    "policy_source",
+    "policy_reason",
+)
+REQUIRED_JSON_ERROR_CODES = (
+    "EXECUTION_DISABLED",
+    "MISSING_TOKEN",
+    "UNSUPPORTED_EXECUTION",
+    "API_ERROR",
+    "UNKNOWN_SITE",
+    "UNKNOWN_FLOW",
+    "INVALID_INPUT",
+    "POLICY_BLOCKED",
+)
 
 
 def _policy_audit_report(root: Path) -> dict[str, object]:
@@ -112,6 +133,35 @@ def _release_check_report(root: Path) -> dict[str, object]:
             "doctor_basics": doctor_basics,
         },
     }
+
+
+def _release_json_check_report(root: Path) -> dict[str, object]:
+    doc_path = root / JSON_SCHEMA_DOC_PATH
+    report = {
+        "ok": True,
+        "level": "OK",
+        "missing_fields": [],
+        "missing_error_codes": [],
+        "path": JSON_SCHEMA_DOC_PATH.as_posix(),
+    }
+
+    if not doc_path.exists():
+        report["ok"] = False
+        report["level"] = "WARN"
+        report["message"] = f"{JSON_SCHEMA_DOC_PATH.as_posix()} is missing."
+        return report
+
+    doc_text = doc_path.read_text(encoding="utf-8")
+    missing_fields = [field for field in REQUIRED_JSON_FIELDS if field not in doc_text]
+    missing_error_codes = [code for code in REQUIRED_JSON_ERROR_CODES if code not in doc_text]
+
+    if missing_fields or missing_error_codes:
+        report["ok"] = False
+        report["level"] = "WARN"
+        report["missing_fields"] = missing_fields
+        report["missing_error_codes"] = missing_error_codes
+
+    return report
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -296,6 +346,8 @@ def build_parser() -> argparse.ArgumentParser:
     release_subcommands = release_parser.add_subparsers(dest="release_command", required=True)
     release_check_parser = release_subcommands.add_parser("check", help="Check whether the local project is ready for a safe release checkpoint.")
     release_check_parser.add_argument("--json", action="store_true", dest="json_output")
+    release_json_check_parser = release_subcommands.add_parser("json-check", help="Check whether the agent-facing JSON contract docs are complete.")
+    release_json_check_parser.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1413,6 +1465,23 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"- {warning['message']}")
 
             return 0 if report["ok"] else 1
+        if args.release_command == "json-check":
+            report = _release_json_check_report(Path.cwd())
+            if args.json_output:
+                print(json.dumps(report))
+                return 0 if report["ok"] else 1
+
+            print(f"JSON contract check: {report['level']}")
+            if report["ok"]:
+                print("docs/agent-json-schema.md includes required agent JSON fields and error codes.")
+                return 0
+            if "message" in report:
+                print(f"- {report['message']}")
+            for field in report["missing_fields"]:
+                print(f"- docs/agent-json-schema.md is missing required field: {field}")
+            for code in report["missing_error_codes"]:
+                print(f"- docs/agent-json-schema.md is missing stable error code: {code}")
+            return 1
 
     parser.error(f"Unknown command: {args.command}")
     return 2
