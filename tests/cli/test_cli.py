@@ -4144,6 +4144,150 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("Config: OK", output.getvalue())
 
+    def test_config_profile_safe_writes_safe_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "profile", "safe"])
+            finally:
+                os.chdir(original_cwd)
+            self.assertEqual(exit_code, 0)
+            from runewall.core.config import load_config
+            cfg = load_config(Path(temp_dir))
+            self.assertEqual(cfg.safety.default_policy, "review")
+            self.assertFalse(cfg.maps.allow_execute)
+            self.assertIn("Applied config profile: safe", output.getvalue())
+            self.assertIn("Path:", output.getvalue())
+
+    def test_config_profile_dev_writes_snapshot_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                exit_code = main(["config", "profile", "dev"])
+            finally:
+                os.chdir(original_cwd)
+            self.assertEqual(exit_code, 0)
+            from runewall.core.config import load_config
+            cfg = load_config(Path(temp_dir))
+            self.assertEqual(cfg.safety.default_policy, "snapshot")
+            self.assertFalse(cfg.maps.allow_execute)
+
+    def test_config_profile_agent_writes_valid_guarded_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                exit_code = main(["config", "profile", "agent"])
+            finally:
+                os.chdir(original_cwd)
+            self.assertEqual(exit_code, 0)
+            from runewall.core.config import load_config
+            cfg = load_config(Path(temp_dir))
+            self.assertEqual(cfg.safety.default_policy, "review")
+            self.assertFalse(cfg.maps.allow_execute)
+
+    def test_config_profile_safe_json_returns_ok_true(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "profile", "safe", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["profile"], "safe")
+        self.assertTrue(data["applied"])
+        self.assertIn("path", data)
+
+    def test_config_profile_unknown_fails_clearly(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["config", "profile", "risky"])
+        self.assertEqual(exit_code, 1)
+        rendered = output.getvalue()
+        self.assertIn("Unknown config profile: risky", rendered)
+        self.assertIn("Known profiles:", rendered)
+        self.assertIn("safe", rendered)
+        self.assertIn("dev", rendered)
+        self.assertIn("agent", rendered)
+
+    def test_config_profile_unknown_json_returns_error(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["config", "profile", "risky", "--json"])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["profile"], "risky")
+        self.assertIn("Unknown config profile: risky", data["error"])
+        self.assertIn("safe", data["known_profiles"])
+        self.assertIn("dev", data["known_profiles"])
+        self.assertIn("agent", data["known_profiles"])
+
+    def test_config_validate_passes_after_safe_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Config: OK", output.getvalue())
+
+    def test_config_validate_passes_after_dev_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "dev"])
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Config: OK", output.getvalue())
+
+    def test_config_validate_passes_after_agent_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "agent"])
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Config: OK", output.getvalue())
+
+    def test_config_profile_does_not_delete_db(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "profile", "safe"])
+                db_path = Path(temp_dir) / ".runewall" / "runewall.db"
+            finally:
+                os.chdir(original_cwd)
+            self.assertTrue(db_path.exists())
+
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
     def test_doctor_custom_vercel_token_env_changes_human_label(self, mocked_find_spec) -> None:

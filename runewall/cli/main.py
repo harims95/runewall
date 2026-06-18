@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import sys
 
-from runewall.core.config import config_path, ensure_config, format_config_data, load_config, load_config_data, RESET_CONFIG_TEXT, safe_config_dict, set_config_value, validate_config_data
+from runewall.core.config import config_path, CONFIG_PROFILES, ensure_config, format_config_data, load_config, load_config_data, RESET_CONFIG_TEXT, safe_config_dict, set_config_value, validate_config_data
 from runewall.core.db import database_path, initialize_database, project_state_dir
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
@@ -77,6 +77,9 @@ def build_parser() -> argparse.ArgumentParser:
     config_validate_parser.add_argument("--json", action="store_true", dest="json_output")
     config_reset_parser = config_subcommands.add_parser("reset", help="Reset config to safe defaults.")
     config_reset_parser.add_argument("--json", action="store_true", dest="json_output")
+    config_profile_parser = config_subcommands.add_parser("profile", help="Apply a named config profile.")
+    config_profile_parser.add_argument("name")
+    config_profile_parser.add_argument("--json", action="store_true", dest="json_output")
     version_parser = subcommands.add_parser("version", help="Print Runewall version.")
     version_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
@@ -186,6 +189,24 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps({"ok": True, "path": str(path.resolve()), "reset": True}))
                 return 0
             print(f"Config reset to defaults: {path}")
+            return 0
+        if args.config_command == "profile":
+            known = list(CONFIG_PROFILES)
+            if args.name not in CONFIG_PROFILES:
+                if args.json_output:
+                    print(json.dumps({"ok": False, "profile": args.name, "error": f"Unknown config profile: {args.name}", "known_profiles": known}))
+                    return 1
+                print(f"Unknown config profile: {args.name}")
+                print(f"Known profiles: {', '.join(known)}")
+                return 1
+            path = config_path(Path.cwd())
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(CONFIG_PROFILES[args.name], encoding="utf-8")
+            if args.json_output:
+                print(json.dumps({"ok": True, "profile": args.name, "path": str(path.resolve()), "applied": True}))
+                return 0
+            print(f"Applied config profile: {args.name}")
+            print(f"Path: {path.resolve()}")
             return 0
     if args.command == "log":
         log = ActionLog(root=Path.cwd())

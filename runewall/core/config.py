@@ -77,6 +77,31 @@ supabase_access_token_env = "SUPABASE_ACCESS_TOKEN"
 cloudflare_api_token_env = "CLOUDFLARE_API_TOKEN"
 """
 
+_PROFILE_DEV_TEXT = """\
+[safety]
+default_policy = "snapshot"
+max_snapshot_mb = 500
+
+[retention]
+snapshot_days = 30
+
+[maps]
+allow_execute = false
+
+[auth]
+github_token_env = "GITHUB_TOKEN"
+vercel_token_env = "VERCEL_TOKEN"
+netlify_token_env = "NETLIFY_TOKEN"
+supabase_access_token_env = "SUPABASE_ACCESS_TOKEN"
+cloudflare_api_token_env = "CLOUDFLARE_API_TOKEN"
+"""
+
+CONFIG_PROFILES: dict[str, str] = {
+    "safe": RESET_CONFIG_TEXT,
+    "dev": _PROFILE_DEV_TEXT,
+    "agent": RESET_CONFIG_TEXT,
+}
+
 _VALID_DEFAULT_POLICIES = {"auto", "review", "snapshot"}
 
 
