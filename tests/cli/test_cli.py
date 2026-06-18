@@ -5041,6 +5041,127 @@ class CliTests(unittest.TestCase):
             finally:
                 os.chdir(original_cwd)
 
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    def test_release_check_exists_as_top_level_command(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["release", "check"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Release check: OK", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    def test_release_check_json_returns_valid_json(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["release", "check", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["level"], "OK")
+        self.assertIn("checks", data)
+        self.assertEqual(data["checks"]["config"]["level"], "OK")
+        self.assertEqual(data["checks"]["policy_audit"]["level"], "OK")
+        self.assertEqual(data["checks"]["maps_lint"]["level"], "OK")
+        self.assertEqual(data["checks"]["doctor_basics"]["level"], "OK")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    def test_safe_profile_release_check_returns_ok(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main(["release", "check"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Release check: OK", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    def test_maps_allow_execute_true_makes_release_check_warn(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "maps.allow_execute", "true"])
+                with redirect_stdout(output):
+                    exit_code = main(["release", "check"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        rendered = output.getvalue()
+        self.assertIn("Release check: WARN", rendered)
+        self.assertIn("Policy audit: WARN", rendered)
+        self.assertIn("- maps.allow_execute is true; real external execution is enabled.", rendered)
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    def test_invalid_config_makes_release_check_fail(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text("[safety]\nmax_snapshot_mb = 0\n", encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["release", "check", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["level"], "FAIL")
+        self.assertEqual(data["checks"]["config"]["level"], "INVALID")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    def test_release_check_does_not_modify_config(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_text = '[rules]\nfile_delete = "auto"\n'
+            config_file.write_text(config_text, encoding="utf-8")
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["release", "check"])
+                self.assertEqual(config_file.read_text(encoding="utf-8"), config_text)
+            finally:
+                os.chdir(original_cwd)
+
     def test_policy_explain_without_rules_still_explains_default_behavior(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

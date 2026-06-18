@@ -41,6 +41,79 @@ def _policy_audit_report(root: Path) -> dict[str, object]:
     }
 
 
+def _config_check_report(root: Path) -> dict[str, object]:
+    errors = validate_config_data(load_config_data(root))
+    return {"level": "OK" if not errors else "INVALID", "errors": errors}
+
+
+def _maps_lint_report() -> dict[str, object]:
+    registry = SiteMapRegistry()
+    validation_results = registry.validate_bundled_maps()
+    lint_errors: list[dict[str, str]] = []
+    lint_warnings: list[dict[str, str]] = []
+
+    for result in validation_results:
+        if not result.ok and result.error is not None:
+            lint_errors.append({"key": result.site_key, "message": result.error})
+
+    for site_map in registry.list_maps():
+        key = site_map.raw.get("_filename", "").removesuffix(".json")
+        warnings, errors = lint_map(site_map)
+        lint_warnings.extend({"key": key, "message": warning} for warning in warnings)
+        lint_errors.extend({"key": key, "message": error} for error in errors)
+
+    return {
+        "level": "OK" if not lint_errors and not lint_warnings else "FAIL",
+        "errors": lint_errors,
+        "warnings": lint_warnings,
+    }
+
+
+def _doctor_basics_report(root: Path) -> dict[str, object]:
+    warnings: list[dict[str, str]] = []
+
+    if not database_path(root).exists():
+        warnings.append({"key": "database", "message": "Runewall DB is missing"})
+    if not config_path(root).exists():
+        warnings.append({"key": "config", "message": "config file is missing"})
+    if importlib.util.find_spec("httpx") is None:
+        warnings.append({"key": "dependencies.httpx", "message": "httpx is missing"})
+    if importlib.util.find_spec("bs4") is None:
+        warnings.append({"key": "dependencies.bs4", "message": "bs4 is missing"})
+    maps_count = len(SiteMapRegistry().list_maps())
+    if maps_count <= 0:
+        warnings.append({"key": "maps", "message": "no bundled maps found"})
+
+    return {"level": "OK" if not warnings else "WARN", "warnings": warnings}
+
+
+def _release_check_report(root: Path) -> dict[str, object]:
+    config_check = _config_check_report(root)
+    policy_audit = _policy_audit_report(root)
+    maps_lint = _maps_lint_report()
+    doctor_basics = _doctor_basics_report(root)
+
+    if config_check["level"] != "OK" or policy_audit["level"] == "INVALID":
+        level = "FAIL"
+    elif maps_lint["level"] != "OK":
+        level = "FAIL"
+    elif policy_audit["level"] == "WARN" or doctor_basics["level"] == "WARN":
+        level = "WARN"
+    else:
+        level = "OK"
+
+    return {
+        "ok": level == "OK",
+        "level": level,
+        "checks": {
+            "config": config_check,
+            "policy_audit": policy_audit,
+            "maps_lint": maps_lint,
+            "doctor_basics": doctor_basics,
+        },
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="runewall")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -134,6 +207,10 @@ def build_parser() -> argparse.ArgumentParser:
     cleanup_subcommands = cleanup_parser.add_subparsers(dest="cleanup_command", required=True)
     cleanup_snapshots_parser = cleanup_subcommands.add_parser("snapshots", help="Delete snapshot directories older than retention period.")
     cleanup_snapshots_parser.add_argument("--json", action="store_true", dest="json_output")
+    release_parser = subcommands.add_parser("release", help="Run local release readiness checks.")
+    release_subcommands = release_parser.add_subparsers(dest="release_command", required=True)
+    release_check_parser = release_subcommands.add_parser("check", help="Check whether the local project is ready for a safe release checkpoint.")
+    release_check_parser.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1219,6 +1296,38 @@ def main(argv: list[str] | None = None) -> int:
             deleted = cleanup_snapshots(root=Path.cwd())
             print(f"Deleted {deleted} old snapshot(s).")
             return 0
+
+    if args.command == "release":
+        if args.release_command == "check":
+            report = _release_check_report(Path.cwd())
+            if args.json_output:
+                print(json.dumps(report))
+                return 0 if report["ok"] else 1
+
+            print(f"Release check: {report['level']}")
+            print(f"Config: {report['checks']['config']['level']}")
+            if report["checks"]["config"]["level"] != "OK":
+                for error in report["checks"]["config"]["errors"]:
+                    print(f"- {error['key']}: {error['message']}")
+
+            print(f"Policy audit: {report['checks']['policy_audit']['level']}")
+            for warning in report["checks"]["policy_audit"]["warnings"]:
+                print(f"- {warning['key']} is true; {warning['message']}." if warning["key"] == "maps.allow_execute" else f"- {warning['key']} is auto; {warning['message']}.")
+            if report["checks"]["policy_audit"]["level"] == "INVALID":
+                for error in report["checks"]["policy_audit"]["errors"]:
+                    print(f"- {error['key']}: {error['message']}")
+
+            print(f"Maps strict lint: {report['checks']['maps_lint']['level']}")
+            for warning in report["checks"]["maps_lint"]["warnings"]:
+                print(f"- {warning['key']}: {warning['message']}")
+            for error in report["checks"]["maps_lint"]["errors"]:
+                print(f"- {error['key']}: {error['message']}")
+
+            print(f"Doctor basics: {report['checks']['doctor_basics']['level']}")
+            for warning in report["checks"]["doctor_basics"]["warnings"]:
+                print(f"- {warning['message']}")
+
+            return 0 if report["ok"] else 1
 
     parser.error(f"Unknown command: {args.command}")
     return 2
