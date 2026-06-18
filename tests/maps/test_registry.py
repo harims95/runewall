@@ -124,6 +124,16 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertEqual(site_map.schema_version, "1.0.0")
         self.assertIn("list_projects", site_map.flows)
 
+    def test_registry_loads_slack_json(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_map("slack.json")
+
+        self.assertEqual(site_map.site_name, "Slack")
+        self.assertEqual(site_map.base_url, "https://slack.com")
+        self.assertEqual(site_map.schema_version, "1.0.0")
+        self.assertIn("send_message", site_map.flows)
+
     def test_validate_bundled_maps_passes_with_github_vercel_netlify_cloudflare_and_linear(self) -> None:
         registry = SiteMapRegistry()
 
@@ -131,7 +141,7 @@ class SiteMapRegistryTests(unittest.TestCase):
 
         by_key = {result.site_key: result for result in results}
 
-        for key in ("github", "vercel", "netlify", "cloudflare", "linear", "supabase"):
+        for key in ("github", "vercel", "netlify", "cloudflare", "linear", "supabase", "slack"):
             self.assertIn(key, by_key)
             self.assertTrue(by_key[key].ok)
             self.assertIsNone(by_key[key].error)

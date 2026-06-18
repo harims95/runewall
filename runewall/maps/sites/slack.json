@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "site": {
+    "name": "Slack",
+    "base_url": "https://slack.com",
+    "map_version": "0.1.0"
+  },
+  "flows": {
+    "send_message": {
+      "description": "Send a Slack message",
+      "risk_level": "medium",
+      "reversible": false,
+      "requires_auth": true,
+      "inputs": {
+        "channel": {
+          "type": "string",
+          "required": true
+        },
+        "text": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "api_path": {
+        "method": "POST",
+        "url": "/api/chat.postMessage"
+      }
+    }
+  }
+}

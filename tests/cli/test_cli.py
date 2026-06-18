@@ -475,6 +475,100 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["missing_inputs"], [])
         self.assertEqual(data["api_path"], {"method": "GET", "url": "/v1/projects"})
 
+    def test_maps_list_includes_slack(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Slack", rendered)
+        self.assertIn("https://slack.com", rendered)
+
+    def test_maps_show_slack_prints_send_message(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "slack"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Slack", rendered)
+        self.assertIn("Base URL: https://slack.com", rendered)
+        self.assertIn("Map version: 0.1.0", rendered)
+        self.assertIn("Schema version: 1.0.0", rendered)
+        self.assertIn("- send_message", rendered)
+        self.assertIn("risk_level: medium", rendered)
+        self.assertIn("reversible: False", rendered)
+        self.assertIn("requires_auth: True", rendered)
+        self.assertIn("required inputs: channel, text", rendered)
+
+    def test_maps_validate_includes_slack_ok(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("slack (Slack)\tOK", rendered)
+
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_dry_run_for_slack_send_message(self, mocked_execute) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "slack", "send_message", "--dry-run",
+                        "--input", "channel=C123",
+                        "--input", "text=Hello",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Slack", rendered)
+        self.assertIn("Flow name: send_message", rendered)
+        self.assertIn("Risk level: medium", rendered)
+        self.assertIn("Reversible: False", rendered)
+        self.assertIn("Requires auth: True", rendered)
+        self.assertIn("- channel=C123", rendered)
+        self.assertIn("- text=Hello", rendered)
+        self.assertIn("Missing inputs: none", rendered)
+        self.assertIn("API path: POST /api/chat.postMessage", rendered)
+        mocked_execute.assert_not_called()
+
+    def test_act_dry_run_json_for_slack_send_message(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "slack", "send_message", "--dry-run", "--json",
+                "--input", "channel=C123",
+                "--input", "text=Hello",
+            ])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "slack")
+        self.assertEqual(data["flow"], "send_message")
+        self.assertEqual(data["risk_level"], "medium")
+        self.assertFalse(data["reversible"])
+        self.assertEqual(data["missing_inputs"], [])
+        self.assertEqual(data["api_path"], {"method": "POST", "url": "/api/chat.postMessage"})
+
+    def test_act_dry_run_slack_missing_text_fails_clearly(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "slack", "send_message", "--dry-run",
+                "--input", "channel=C123",
+            ])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Missing inputs: text", rendered)
+        self.assertIn("Missing required inputs: text", rendered)
+
     def test_maps_show_unknown_site_fails_clearly(self) -> None:
         output = io.StringIO()
 
