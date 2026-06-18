@@ -44,6 +44,11 @@ def build_parser() -> argparse.ArgumentParser:
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
     maps_list_parser = maps_subcommands.add_parser("list", help="List bundled site maps.")
     maps_list_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_list_parser.add_argument("--category", default=None)
+    maps_list_parser.add_argument("--tag", default=None)
+    maps_search_parser = maps_subcommands.add_parser("search", help="Search bundled site maps.")
+    maps_search_parser.add_argument("query")
+    maps_search_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_subcommands.add_parser("path", help="Show the bundled site maps directory.")
     maps_validate_parser = maps_subcommands.add_parser("validate", help="Validate bundled site maps.")
     maps_validate_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -339,6 +344,10 @@ def main(argv: list[str] | None = None) -> int:
         registry = SiteMapRegistry()
         if args.maps_command == "list":
             site_maps = registry.list_maps()
+            if args.category:
+                site_maps = [m for m in site_maps if m.category == args.category]
+            if args.tag:
+                site_maps = [m for m in site_maps if args.tag in m.tags]
 
             if args.json_output:
                 print(json.dumps({
@@ -358,7 +367,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
 
             if not site_maps:
-                print("No bundled site maps found.")
+                print("No maps found.")
                 return 0
 
             print("site_name\tbase_url\tflows")
@@ -372,6 +381,33 @@ def main(argv: list[str] | None = None) -> int:
                         ]
                     )
                 )
+            return 0
+        if args.maps_command == "search":
+            results = registry.search_maps(args.query)
+            if args.json_output:
+                print(json.dumps({
+                    "query": args.query,
+                    "count": len(results),
+                    "maps": [
+                        {
+                            "key": sm.raw.get("_filename", "").removesuffix(".json"),
+                            "site_name": sm.site_name,
+                            "base_url": sm.base_url,
+                            "category": sm.category,
+                            "tags": sm.tags,
+                            "flow_count": len(sm.flows),
+                            "flows": list(sm.flows.keys()),
+                        }
+                        for sm in results
+                    ],
+                }))
+                return 0
+            if not results:
+                print("No maps found.")
+                return 0
+            print("site_name\tbase_url\tflows")
+            for sm in results:
+                print("\t".join([sm.site_name, sm.base_url, str(len(sm.flows))]))
             return 0
         if args.maps_command == "path":
             maps_path = registry.bundled_maps_path()

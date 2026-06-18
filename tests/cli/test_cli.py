@@ -2986,5 +2986,93 @@ class CliTests(unittest.TestCase):
         self.assertIn("Slack", rendered)
 
 
+    def test_maps_list_category_deployment_returns_vercel_and_netlify(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list", "--category", "deployment"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Vercel", rendered)
+        self.assertIn("Netlify", rendered)
+        self.assertNotIn("GitHub", rendered)
+        self.assertNotIn("Slack", rendered)
+
+    def test_maps_list_tag_chat_returns_slack_and_discord(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list", "--tag", "chat"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Slack", rendered)
+        self.assertIn("Discord", rendered)
+        self.assertNotIn("GitHub", rendered)
+        self.assertNotIn("Vercel", rendered)
+
+    def test_maps_list_category_deployment_json_returns_only_deployment_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list", "--category", "deployment", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        keys = {e["key"] for e in data["maps"]}
+        self.assertIn("vercel", keys)
+        self.assertIn("netlify", keys)
+        self.assertNotIn("github", keys)
+        for entry in data["maps"]:
+            self.assertEqual(entry["category"], "deployment")
+
+    def test_maps_search_deploy_returns_deployment_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "search", "deploy"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Vercel", rendered)
+        self.assertIn("Netlify", rendered)
+        self.assertNotIn("GitHub", rendered)
+
+    def test_maps_search_chat_returns_communication_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "search", "chat"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Slack", rendered)
+        self.assertIn("Discord", rendered)
+        self.assertNotIn("GitHub", rendered)
+
+    def test_maps_search_unknown_returns_no_maps_message(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "search", "xyznotfound"])
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(output.getvalue().strip(), "No maps found.")
+
+    def test_maps_search_unknown_json_returns_count_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "search", "xyznotfound", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["query"], "xyznotfound")
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(data["maps"], [])
+
+    def test_maps_search_deploy_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "search", "deploy", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["query"], "deploy")
+        self.assertGreater(data["count"], 0)
+        keys = {e["key"] for e in data["maps"]}
+        self.assertIn("vercel", keys)
+        self.assertIn("netlify", keys)
+
+
 if __name__ == "__main__":
     unittest.main()

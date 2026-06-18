@@ -99,6 +99,31 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertEqual(site_map.category, "")
         self.assertEqual(site_map.tags, [])
 
+    def test_search_maps_deploy_returns_vercel_and_netlify(self) -> None:
+        registry = SiteMapRegistry()
+
+        results = registry.search_maps("deploy")
+
+        names = {sm.site_name for sm in results}
+        self.assertIn("Vercel", names)
+        self.assertIn("Netlify", names)
+
+    def test_search_maps_chat_returns_slack_and_discord(self) -> None:
+        registry = SiteMapRegistry()
+
+        results = registry.search_maps("chat")
+
+        names = {sm.site_name for sm in results}
+        self.assertIn("Slack", names)
+        self.assertIn("Discord", names)
+
+    def test_search_maps_no_match_returns_empty(self) -> None:
+        registry = SiteMapRegistry()
+
+        results = registry.search_maps("xyznotfound")
+
+        self.assertEqual(results, [])
+
     def test_load_site_by_key_returns_github(self) -> None:
         registry = SiteMapRegistry()
 

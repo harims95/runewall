@@ -105,6 +105,27 @@ class SiteMapRegistry:
             raise FlowNotFoundError(f"Flow not found for {site_map.site_name}: {flow_name}")
         return flow
 
+    def search_maps(self, query: str) -> list[SiteMap]:
+        q = query.strip().lower()
+        results = []
+        for site_map in self.list_maps():
+            key = site_map.raw.get("_filename", "").removesuffix(".json").lower()
+            flow_names = [name.lower() for name in site_map.flows]
+            flow_descriptions = [
+                str(fd.get("description", "")).lower()
+                for fd in site_map.flows.values()
+            ]
+            if (
+                q in key
+                or q in site_map.site_name.lower()
+                or q in site_map.category.lower()
+                or any(q in tag.lower() for tag in site_map.tags)
+                or any(q in fn for fn in flow_names)
+                or any(q in fd for fd in flow_descriptions)
+            ):
+                results.append(site_map)
+        return results
+
     def load_map(self, filename: str) -> SiteMap:
         map_resource = resources.files("runewall.maps").joinpath("sites", filename)
         with map_resource.open("r", encoding="utf-8") as handle:
