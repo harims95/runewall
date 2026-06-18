@@ -3334,10 +3334,10 @@ class CliTests(unittest.TestCase):
             main(["maps", "stats", "--json"])
         import json as _json
         data = _json.loads(output.getvalue())
-        for key in ("slack", "discord", "cloudflare", "linear", "supabase"):
+        for key in ("slack", "discord", "cloudflare", "linear"):
             self.assertIn(key, data["dry_run_only_maps"])
             self.assertNotIn(key, data["real_execution_maps"])
-        for key in ("vercel", "netlify"):
+        for key in ("vercel", "netlify", "supabase"):
             self.assertIn(key, data["real_execution_maps"])
             self.assertNotIn(key, data["dry_run_only_maps"])
         self.assertNotIn("vercel", data["dry_run_only_maps"])

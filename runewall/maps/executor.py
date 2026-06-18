@@ -23,6 +23,27 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
             "Map execution is disabled by config. Set [maps] allow_execute = true to enable."
         )
 
+    if normalized_site == "supabase" and normalized_flow == "list_projects":
+        token = os.environ.get("SUPABASE_ACCESS_TOKEN")
+        if not token:
+            raise MapExecutionError("SUPABASE_ACCESS_TOKEN is required to execute supabase:list_projects.")
+        response = _httpx_get(
+            "https://api.supabase.com/v1/projects",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+        )
+        if response.status_code >= 400:
+            detail = _error_detail(response)
+            raise MapExecutionError(f"Supabase list_projects failed: {response.status_code} {detail}")
+        payload = response.json()
+        projects_raw = payload if isinstance(payload, list) else []
+        projects = [
+            {k: v for k, v in p.items() if k in ("id", "name", "region", "status")}
+            for p in projects_raw
+            if isinstance(p, dict)
+        ]
+        return {"project_count": len(projects), "projects": projects}
+
     if normalized_site == "netlify" and normalized_flow == "list_sites":
         token = os.environ.get("NETLIFY_TOKEN")
         if not token:
@@ -101,6 +122,7 @@ def _is_supported_execution(site: str, flow: str) -> bool:
         (site == "github" and flow == "create_issue")
         or (site == "vercel" and flow == "list_projects")
         or (site == "netlify" and flow == "list_sites")
+        or (site == "supabase" and flow == "list_projects")
     )
 
 

@@ -86,6 +86,74 @@ class MapExecutorTests(unittest.TestCase):
         self.assertEqual(kwargs["json"], {"title": "Bug report", "body": "Details"})
         self.assertNotIn("secret-token", str(kwargs["json"]))
 
+    def test_execute_supabase_list_projects_blocked_by_default_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("supabase", "list_projects", {}, root=Path(temp_dir))
+
+        self.assertEqual(
+            str(context.exception),
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+        )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_execute_supabase_list_projects_missing_token_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("supabase", "list_projects", {}, root=root)
+
+        self.assertEqual(
+            str(context.exception),
+            "SUPABASE_ACCESS_TOKEN is required to execute supabase:list_projects.",
+        )
+
+    @patch.dict("os.environ", {"SUPABASE_ACCESS_TOKEN": "secret-supabase-token"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_mocked_successful_supabase_response_returns_project_result(self, mocked_get) -> None:
+        class Response:
+            status_code = 200
+
+            @staticmethod
+            def json() -> list[dict[str, object]]:
+                return [
+                    {"id": "proj_1", "name": "my-db", "region": "us-east-1", "status": "ACTIVE_HEALTHY"},
+                    {"id": "proj_2", "name": "staging-db", "region": "eu-west-1", "status": "ACTIVE_HEALTHY"},
+                ]
+
+        mocked_get.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            result = execute_map_action("supabase", "list_projects", {}, root=root)
+
+        self.assertEqual(result["project_count"], 2)
+        self.assertEqual(len(result["projects"]), 2)
+        self.assertEqual(result["projects"][0]["name"], "my-db")
+        self.assertNotIn("secret-supabase-token", str(result))
+
+    @patch.dict("os.environ", {"SUPABASE_ACCESS_TOKEN": "secret-supabase-token"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_supabase_token_not_in_logged_result(self, mocked_get) -> None:
+        class Response:
+            status_code = 200
+
+            @staticmethod
+            def json() -> list[dict[str, object]]:
+                return []
+
+        mocked_get.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            result = execute_map_action("supabase", "list_projects", {}, root=root)
+
+        self.assertNotIn("secret-supabase-token", str(result))
+
     def test_execute_netlify_list_sites_blocked_by_default_config(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(MapExecutionError) as context:
