@@ -345,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
         validation_error = missing_inputs_error(plan)
+        policy_explanation = explain_policy("map.dry_run", load_config(Path.cwd()))
+        policy_decision = decision_for_policy(policy_explanation.policy)
 
         if args.json_output and args.dry_run:
             if validation_error is not None:
@@ -385,11 +387,19 @@ def main(argv: list[str] | None = None) -> int:
                 "missing_inputs": plan.missing_inputs,
                 "api_path": plan.api_path,
                 "ui_steps_count": plan.ui_steps_count,
+                "policy": policy_explanation.policy_name,
+                "decision": policy_decision,
+                "policy_source": policy_explanation.source,
+                "policy_reason": policy_explanation.reason,
             }))
             return 0
 
         if args.dry_run:
             print(render_plan(plan))
+            print(f"Policy: {policy_explanation.policy_name}")
+            print(f"Decision: {policy_decision}")
+            print(f"Source: {policy_explanation.source_label}")
+            print(f"Reason: {policy_explanation.reason}")
         if validation_error is not None:
             if log is not None:
                 log.add_action(

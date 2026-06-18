@@ -402,6 +402,10 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["reversible"])
         self.assertEqual(data["missing_inputs"], [])
         self.assertEqual(data["api_path"], {"method": "POST", "url": "/graphql"})
+        self.assertEqual(data["policy"], "auto")
+        self.assertEqual(data["decision"], "allow")
+        self.assertEqual(data["policy_source"], "config_rule")
+        self.assertEqual(data["policy_reason"], 'rules.map_dry_run = "auto"')
 
     def test_maps_list_includes_supabase(self) -> None:
         output = io.StringIO()
@@ -3165,6 +3169,70 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["missing_inputs"], [])
         self.assertIn("provided_inputs", data)
         self.assertIn("ui_steps_count", data)
+        self.assertEqual(data["policy"], "auto")
+        self.assertEqual(data["decision"], "allow")
+        self.assertEqual(data["policy_source"], "config_rule")
+        self.assertEqual(data["policy_reason"], 'rules.map_dry_run = "auto"')
+
+    def test_act_dry_run_human_output_includes_policy_details(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "github", "create_issue", "--dry-run",
+                "--input", "repo=user/repo",
+                "--input", "title=Bug",
+            ])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: auto", rendered)
+        self.assertIn("Decision: allow", rendered)
+        self.assertIn("Source: config rule", rendered)
+
+    def test_act_dry_run_json_safe_profile_includes_auto_allow_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "github", "create_issue", "--dry-run", "--json",
+                        "--input", "repo=user/repo",
+                        "--input", "title=Bug",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["policy"], "auto")
+        self.assertEqual(data["decision"], "allow")
+
+    def test_act_dry_run_json_rules_map_dry_run_block_returns_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.map_dry_run", "block"])
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "github", "create_issue", "--dry-run", "--json",
+                        "--input", "repo=user/repo",
+                        "--input", "title=Bug",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["policy"], "block")
+        self.assertEqual(data["decision"], "blocked")
+        self.assertEqual(data["policy_source"], "config_rule")
+        self.assertEqual(data["policy_reason"], 'rules.map_dry_run = "block"')
 
     def test_act_dry_run_json_missing_input_prints_json_error_and_exits_nonzero(self) -> None:
         output = io.StringIO()
