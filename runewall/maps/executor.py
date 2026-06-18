@@ -31,6 +31,27 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
             error_code="EXECUTION_DISABLED",
         )
 
+    if normalized_site == "cloudflare" and normalized_flow == "list_zones":
+        token = os.environ.get("CLOUDFLARE_API_TOKEN")
+        if not token:
+            raise MapExecutionError("CLOUDFLARE_API_TOKEN is required to execute cloudflare:list_zones.", error_code="MISSING_TOKEN")
+        response = _httpx_get(
+            "https://api.cloudflare.com/client/v4/zones",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+        )
+        if response.status_code >= 400:
+            detail = _error_detail(response)
+            raise MapExecutionError(f"Cloudflare list_zones failed: {response.status_code} {detail}", error_code="API_ERROR")
+        payload = response.json()
+        zones_raw = payload.get("result", []) if isinstance(payload, dict) else []
+        zones = [
+            {k: v for k, v in z.items() if k in ("id", "name", "status", "type")}
+            for z in zones_raw
+            if isinstance(z, dict)
+        ]
+        return {"zone_count": len(zones), "zones": zones}
+
     if normalized_site == "supabase" and normalized_flow == "list_projects":
         token = os.environ.get("SUPABASE_ACCESS_TOKEN")
         if not token:
@@ -131,6 +152,7 @@ def _is_supported_execution(site: str, flow: str) -> bool:
         or (site == "vercel" and flow == "list_projects")
         or (site == "netlify" and flow == "list_sites")
         or (site == "supabase" and flow == "list_projects")
+        or (site == "cloudflare" and flow == "list_zones")
     )
 
 

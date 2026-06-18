@@ -356,6 +356,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Listed {result['site_count']} Netlify site(s).")
         elif args.site.lower() == "supabase":
             print(f"Listed {result['project_count']} Supabase project(s).")
+        elif args.site.lower() == "cloudflare":
+            print(f"Listed {result['zone_count']} Cloudflare zone(s).")
         else:
             print(f"Created GitHub issue for {inputs['repo']}.")
             if "issue_number" in result:
@@ -517,7 +519,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.maps_command == "stats":
             site_maps = registry.list_maps()
-            real_execution_keys = {"github", "vercel", "netlify", "supabase"}
+            real_execution_keys = {"github", "vercel", "netlify", "supabase", "cloudflare"}
             total_maps = len(site_maps)
             total_flows = sum(len(sm.flows) for sm in site_maps)
             categories: dict[str, int] = {}

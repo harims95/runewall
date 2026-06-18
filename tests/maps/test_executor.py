@@ -86,6 +86,78 @@ class MapExecutorTests(unittest.TestCase):
         self.assertEqual(kwargs["json"], {"title": "Bug report", "body": "Details"})
         self.assertNotIn("secret-token", str(kwargs["json"]))
 
+    def test_execute_cloudflare_list_zones_blocked_by_default_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("cloudflare", "list_zones", {}, root=Path(temp_dir))
+
+        self.assertEqual(
+            str(context.exception),
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+        )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_execute_cloudflare_list_zones_missing_token_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("cloudflare", "list_zones", {}, root=root)
+
+        self.assertEqual(
+            str(context.exception),
+            "CLOUDFLARE_API_TOKEN is required to execute cloudflare:list_zones.",
+        )
+        self.assertEqual(context.exception.error_code, "MISSING_TOKEN")
+
+    @patch.dict("os.environ", {"CLOUDFLARE_API_TOKEN": "secret-cf-token"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_mocked_successful_cloudflare_response_returns_zone_result(self, mocked_get) -> None:
+        class Response:
+            status_code = 200
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {
+                    "result": [
+                        {"id": "zone_1", "name": "example.com", "status": "active", "type": "full"},
+                        {"id": "zone_2", "name": "other.com", "status": "active", "type": "full"},
+                    ],
+                    "success": True,
+                }
+
+        mocked_get.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            result = execute_map_action("cloudflare", "list_zones", {}, root=root)
+
+        self.assertEqual(result["zone_count"], 2)
+        self.assertEqual(len(result["zones"]), 2)
+        self.assertEqual(result["zones"][0]["name"], "example.com")
+        self.assertNotIn("secret-cf-token", str(result))
+
+    @patch.dict("os.environ", {"CLOUDFLARE_API_TOKEN": "secret-cf-token"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_cloudflare_token_not_in_logged_result(self, mocked_get) -> None:
+        class Response:
+            status_code = 200
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {"result": [], "success": True}
+
+        mocked_get.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            result = execute_map_action("cloudflare", "list_zones", {}, root=root)
+
+        self.assertNotIn("secret-cf-token", str(result))
+
     def test_execute_supabase_list_projects_blocked_by_default_config(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(MapExecutionError) as context:

@@ -1612,16 +1612,18 @@ class CliTests(unittest.TestCase):
                     exit_code = main(
                         [
                             "act",
-                            "cloudflare",
-                            "list_zones",
+                            "linear",
+                            "create_issue",
                             "--execute",
+                            "--input", "team_id=t",
+                            "--input", "title=Bug",
                         ]
                     )
             finally:
                 os.chdir(original_cwd)
 
         self.assertEqual(exit_code, 1)
-        self.assertEqual(output.getvalue().strip(), "Execution is not supported for cloudflare:list_zones.")
+        self.assertEqual(output.getvalue().strip(), "Execution is not supported for linear:create_issue.")
 
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3023,7 +3025,8 @@ class CliTests(unittest.TestCase):
                 config_file.parent.mkdir(parents=True, exist_ok=True)
                 config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
                 with redirect_stdout(output):
-                    main(["act", "cloudflare", "list_zones", "--execute", "--json"])
+                    main(["act", "linear", "create_issue", "--execute", "--json",
+                          "--input", "team_id=t", "--input", "title=Bug"])
             finally:
                 os.chdir(original_cwd)
         import json as _json
@@ -3211,6 +3214,53 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["result"]["project_count"], 3)
         self.assertNotIn("secret-supabase-token", output.getvalue())
 
+    @patch.dict("os.environ", {}, clear=True)
+    def test_act_execute_cloudflare_json_missing_token_returns_missing_token(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "cloudflare", "list_zones", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error_code"], "MISSING_TOKEN")
+        self.assertEqual(data["site"], "cloudflare")
+
+    @patch.dict("os.environ", {"CLOUDFLARE_API_TOKEN": "secret-cf-token"}, clear=True)
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_execute_json_cloudflare_success(self, mocked_execute) -> None:
+        mocked_execute.return_value = {"zone_count": 2, "zones": [{"id": "z1", "name": "example.com"}]}
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "cloudflare", "list_zones", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["executed"])
+        self.assertEqual(data["result"]["zone_count"], 2)
+        self.assertNotIn("secret-cf-token", output.getvalue())
+
     @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-github-token"}, clear=True)
     @patch("runewall.cli.main.execute_map_action")
     def test_act_execute_json_github_success(self, mocked_execute) -> None:
@@ -3249,7 +3299,8 @@ class CliTests(unittest.TestCase):
                 config_file.parent.mkdir(parents=True, exist_ok=True)
                 config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
                 with redirect_stdout(output):
-                    exit_code = main(["act", "cloudflare", "list_zones", "--execute", "--json"])
+                    exit_code = main(["act", "linear", "create_issue", "--execute", "--json",
+                                      "--input", "team_id=t", "--input", "title=Bug"])
             finally:
                 os.chdir(original_cwd)
 
@@ -3258,7 +3309,7 @@ class CliTests(unittest.TestCase):
         data = _json.loads(output.getvalue())
         self.assertFalse(data["ok"])
         self.assertFalse(data["executed"])
-        self.assertEqual(data["site"], "cloudflare")
+        self.assertEqual(data["site"], "linear")
         self.assertIn("not supported", data["error"].lower())
 
     def test_act_dry_run_human_output_unchanged_after_json_added(self) -> None:
@@ -3681,10 +3732,10 @@ class CliTests(unittest.TestCase):
             main(["maps", "stats", "--json"])
         import json as _json
         data = _json.loads(output.getvalue())
-        for key in ("slack", "discord", "cloudflare", "linear"):
+        for key in ("slack", "discord", "linear"):
             self.assertIn(key, data["dry_run_only_maps"])
             self.assertNotIn(key, data["real_execution_maps"])
-        for key in ("vercel", "netlify", "supabase"):
+        for key in ("vercel", "netlify", "supabase", "cloudflare"):
             self.assertIn(key, data["real_execution_maps"])
             self.assertNotIn(key, data["dry_run_only_maps"])
         self.assertNotIn("vercel", data["dry_run_only_maps"])
