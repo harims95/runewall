@@ -9,6 +9,7 @@
   },
   "flows": {
     "create_issue": {
+      "description": "Create a GitHub issue",
       "risk_level": "low",
       "reversible": true,
       "requires_auth": true,
@@ -25,6 +26,10 @@
           "type": "string",
           "required": false
         }
+      },
+      "api_path": {
+        "method": "POST",
+        "url": "/repos/{repo}/issues"
       }
     }
   }

@@ -9,6 +9,7 @@
   },
   "flows": {
     "list_zones": {
+      "description": "List Cloudflare zones",
       "risk_level": "low",
       "reversible": false,
       "requires_auth": true,

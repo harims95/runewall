@@ -9,6 +9,7 @@
   },
   "flows": {
     "list_projects": {
+      "description": "List Vercel projects",
       "risk_level": "low",
       "reversible": false,
       "requires_auth": true,

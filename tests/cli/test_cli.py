@@ -2982,13 +2982,15 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("Map lint results", output.getvalue())
 
-    def test_maps_lint_reports_warnings_for_github(self) -> None:
+    def test_maps_lint_shows_all_bundled_maps_ok(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
             main(["maps", "lint"])
         rendered = output.getvalue()
         self.assertIn("github", rendered)
-        self.assertIn("description is empty", rendered)
+        self.assertNotIn("description is empty", rendered)
+        for key in ("cloudflare", "github", "netlify", "vercel", "slack", "discord", "linear", "supabase"):
+            self.assertIn(f"{key}: OK", rendered)
 
     def test_maps_lint_json_prints_valid_json(self) -> None:
         output = io.StringIO()
@@ -3010,11 +3012,12 @@ class CliTests(unittest.TestCase):
         data = _json.loads(output.getvalue())
         self.assertTrue(data["ok"])
         self.assertEqual(data["error_count"], 0)
-        self.assertGreaterEqual(data["warning_count"], 1)
+        self.assertEqual(data["warning_count"], 0)
         github_result = next(r for r in data["results"] if r["key"] == "github")
         self.assertIsInstance(github_result["warnings"], list)
         self.assertIsInstance(github_result["errors"], list)
-        self.assertTrue(any("description is empty" in w for w in github_result["warnings"]))
+        self.assertEqual(github_result["warnings"], [])
+        self.assertEqual(github_result["errors"], [])
 
     def test_maps_validate_still_works_alongside_lint(self) -> None:
         output = io.StringIO()

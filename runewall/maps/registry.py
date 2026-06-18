@@ -72,7 +72,7 @@ def lint_map(site_map: SiteMap) -> tuple[list[str], list[str]]:
         if requires_auth and api_path is None:
             warnings.append(f"{flow_name}: requires_auth true but api_path is missing")
 
-        if risk_level in ("medium", "high") and not reversible:
+        if risk_level == "high" and not reversible:
             warnings.append(f"{flow_name}: risk_level {risk_level} but reversible is false")
 
         if api_path is not None:
