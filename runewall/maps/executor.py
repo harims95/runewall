@@ -9,9 +9,16 @@ from runewall.core.config import load_config
 class MapExecutionError(RuntimeError):
     """Raised when mapped execution cannot complete safely."""
 
+    def __init__(self, message: str, error_code: str = "UNKNOWN_ERROR") -> None:
+        super().__init__(message)
+        self.error_code = error_code
+
 
 class UnsupportedExecutionError(MapExecutionError):
     """Raised when a mapped execution path is not implemented."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, error_code="UNSUPPORTED_EXECUTION")
 
 def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path | None = None) -> dict[str, Any]:
     normalized_site = site.strip().lower()
@@ -20,13 +27,14 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         raise UnsupportedExecutionError(f"Execution is not supported for {site}:{flow}.")
     if not load_config(root).maps.allow_execute:
         raise MapExecutionError(
-            "Map execution is disabled by config. Set [maps] allow_execute = true to enable."
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+            error_code="EXECUTION_DISABLED",
         )
 
     if normalized_site == "supabase" and normalized_flow == "list_projects":
         token = os.environ.get("SUPABASE_ACCESS_TOKEN")
         if not token:
-            raise MapExecutionError("SUPABASE_ACCESS_TOKEN is required to execute supabase:list_projects.")
+            raise MapExecutionError("SUPABASE_ACCESS_TOKEN is required to execute supabase:list_projects.", error_code="MISSING_TOKEN")
         response = _httpx_get(
             "https://api.supabase.com/v1/projects",
             headers={"Authorization": f"Bearer {token}"},
@@ -34,7 +42,7 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         )
         if response.status_code >= 400:
             detail = _error_detail(response)
-            raise MapExecutionError(f"Supabase list_projects failed: {response.status_code} {detail}")
+            raise MapExecutionError(f"Supabase list_projects failed: {response.status_code} {detail}", error_code="API_ERROR")
         payload = response.json()
         projects_raw = payload if isinstance(payload, list) else []
         projects = [
@@ -47,7 +55,7 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
     if normalized_site == "netlify" and normalized_flow == "list_sites":
         token = os.environ.get("NETLIFY_TOKEN")
         if not token:
-            raise MapExecutionError("NETLIFY_TOKEN is required to execute netlify:list_sites.")
+            raise MapExecutionError("NETLIFY_TOKEN is required to execute netlify:list_sites.", error_code="MISSING_TOKEN")
         response = _httpx_get(
             "https://api.netlify.com/api/v1/sites",
             headers={"Authorization": f"Bearer {token}"},
@@ -55,7 +63,7 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         )
         if response.status_code >= 400:
             detail = _error_detail(response)
-            raise MapExecutionError(f"Netlify list_sites failed: {response.status_code} {detail}")
+            raise MapExecutionError(f"Netlify list_sites failed: {response.status_code} {detail}", error_code="API_ERROR")
         payload = response.json()
         sites_raw = payload if isinstance(payload, list) else []
         sites = [
@@ -68,7 +76,7 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
     if normalized_site == "vercel" and normalized_flow == "list_projects":
         token = os.environ.get("VERCEL_TOKEN")
         if not token:
-            raise MapExecutionError("VERCEL_TOKEN is required to execute vercel:list_projects.")
+            raise MapExecutionError("VERCEL_TOKEN is required to execute vercel:list_projects.", error_code="MISSING_TOKEN")
         response = _httpx_get(
             "https://api.vercel.com/v9/projects",
             headers={"Authorization": f"Bearer {token}"},
@@ -76,7 +84,7 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         )
         if response.status_code >= 400:
             detail = _error_detail(response)
-            raise MapExecutionError(f"Vercel list_projects failed: {response.status_code} {detail}")
+            raise MapExecutionError(f"Vercel list_projects failed: {response.status_code} {detail}", error_code="API_ERROR")
         payload = response.json()
         projects_raw = payload.get("projects", []) if isinstance(payload, dict) else []
         projects = [
@@ -88,7 +96,7 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
 
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
-        raise MapExecutionError("GITHUB_TOKEN is required to execute github:create_issue.")
+        raise MapExecutionError("GITHUB_TOKEN is required to execute github:create_issue.", error_code="MISSING_TOKEN")
 
     repo = inputs["repo"]
     response = _httpx_post(
@@ -106,7 +114,7 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
 
     if response.status_code >= 400:
         detail = _error_detail(response)
-        raise MapExecutionError(f"GitHub create_issue failed: {response.status_code} {detail}")
+        raise MapExecutionError(f"GitHub create_issue failed: {response.status_code} {detail}", error_code="API_ERROR")
 
     payload = response.json()
     result: dict[str, Any] = {}

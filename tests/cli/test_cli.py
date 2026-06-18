@@ -2980,6 +2980,112 @@ class CliTests(unittest.TestCase):
         import json as _json
         _json.loads(output.getvalue())
 
+    def test_execute_json_error_code_execution_disabled(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["act", "github", "create_issue", "--execute", "--json",
+                          "--input", "repo=u/r", "--input", "title=t"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["error_code"], "EXECUTION_DISABLED")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_execute_json_error_code_missing_token(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    main(["act", "vercel", "list_projects", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["error_code"], "MISSING_TOKEN")
+
+    def test_execute_json_error_code_unsupported_execution(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    main(["act", "cloudflare", "list_zones", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["error_code"], "UNSUPPORTED_EXECUTION")
+
+    @patch.dict("os.environ", {"VERCEL_TOKEN": "tok"}, clear=True)
+    @patch("runewall.cli.main.execute_map_action")
+    def test_execute_json_error_code_api_error(self, mocked_execute) -> None:
+        from runewall.maps.executor import MapExecutionError
+        mocked_execute.side_effect = MapExecutionError("API error", error_code="API_ERROR")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    main(["act", "vercel", "list_projects", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["error_code"], "API_ERROR")
+        self.assertNotIn("tok", output.getvalue())
+
+    def test_execute_json_error_code_unknown_site(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["act", "unknown_site", "create_issue", "--execute", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["error_code"], "UNKNOWN_SITE")
+
+    def test_execute_json_error_code_unknown_flow(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["act", "github", "unknown_flow", "--execute", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["error_code"], "UNKNOWN_FLOW")
+
+    def test_execute_json_error_code_invalid_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    main(["act", "github", "create_issue", "--execute", "--json",
+                          "--input", "repo=u/r"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["error_code"], "INVALID_INPUT")
+
     def test_act_execute_json_blocked_by_config_prints_valid_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

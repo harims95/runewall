@@ -304,5 +304,43 @@ class MapExecutorTests(unittest.TestCase):
         )
 
 
+    def test_execution_disabled_has_error_code(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("github", "create_issue", {"repo": "u/r", "title": "t"}, root=Path(temp_dir))
+        self.assertEqual(context.exception.error_code, "EXECUTION_DISABLED")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_missing_vercel_token_has_missing_token_error_code(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("vercel", "list_projects", {}, root=root)
+        self.assertEqual(context.exception.error_code, "MISSING_TOKEN")
+
+    def test_unsupported_execution_has_unsupported_error_code(self) -> None:
+        with self.assertRaises(UnsupportedExecutionError) as context:
+            execute_map_action("slack", "send_message", {})
+        self.assertEqual(context.exception.error_code, "UNSUPPORTED_EXECUTION")
+
+    @patch.dict("os.environ", {"VERCEL_TOKEN": "tok"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_api_failure_has_api_error_code(self, mocked_get) -> None:
+        class Response:
+            status_code = 401
+            def json(self) -> dict[str, str]:
+                return {"message": "Unauthorized"}
+            text = "Unauthorized"
+
+        mocked_get.return_value = Response()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("vercel", "list_projects", {}, root=root)
+        self.assertEqual(context.exception.error_code, "API_ERROR")
+
+
 if __name__ == "__main__":
     unittest.main()

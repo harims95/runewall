@@ -220,13 +220,13 @@ def main(argv: list[str] | None = None) -> int:
             plan = planner.build_plan(args.site, args.flow, inputs)
         except SiteMapNotFoundError as error:
             if args.json_output:
-                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": f"Unknown site: {args.site}"}))
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": f"Unknown site: {args.site}", "error_code": "UNKNOWN_SITE"}))
             else:
                 print(str(error))
             return 1
         except FlowNotFoundError as error:
             if args.json_output:
-                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": f"Unknown flow: {args.flow}"}))
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": f"Unknown flow: {args.flow}", "error_code": "UNKNOWN_FLOW"}))
             else:
                 print(str(error))
             return 1
@@ -246,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
                             reversible=False,
                         )
                     )
-                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": validation_error}))
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": validation_error, "error_code": "INVALID_INPUT"}))
                 return 1
             if log is not None:
                 log.add_action(
@@ -289,6 +289,9 @@ def main(argv: list[str] | None = None) -> int:
                         reversible=False,
                     )
                 )
+            if args.json_output and not args.dry_run:
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": validation_error, "error_code": "INVALID_INPUT"}))
+                return 1
             print(validation_error)
             return 1
 
@@ -323,7 +326,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
             if args.json_output:
-                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error)}))
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error), "error_code": getattr(error, "error_code", "UNKNOWN_ERROR")}))
                 return 1
             print(str(error))
             return 1
