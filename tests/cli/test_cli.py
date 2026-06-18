@@ -52,6 +52,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("Run local release readiness checks.", rendered)
         self.assertIn("check", rendered)
         self.assertIn("json-check", rendered)
+        self.assertIn("examples", rendered)
 
     def test_maps_help_exits_zero_and_mentions_lint(self) -> None:
         output = io.StringIO()
@@ -5150,6 +5151,50 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["missing_error_codes"], [])
         self.assertEqual(data["path"], "docs/agent-json-schema.md")
         self.assertEqual(data["message"], "docs/agent-json-schema.md is missing.")
+
+    def test_release_examples_exists(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "examples"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Release examples", rendered)
+
+    def test_release_examples_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "examples", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(
+            data["examples"],
+            [
+                "runewall config profile safe",
+                "runewall config validate",
+                "runewall policy audit",
+                "runewall maps lint --strict",
+                "runewall doctor",
+                "runewall release check",
+                "runewall release json-check",
+                "python -m pytest tests -v",
+            ],
+        )
+
+    def test_release_examples_include_release_check(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "examples"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("- runewall release check", output.getvalue())
+
+    def test_release_examples_include_release_json_check(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "examples"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("- runewall release json-check", output.getvalue())
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     def test_release_check_json_returns_valid_json(self, mocked_find_spec) -> None:

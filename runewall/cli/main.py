@@ -47,6 +47,16 @@ REQUIRED_JSON_ERROR_CODES = (
     "INVALID_INPUT",
     "POLICY_BLOCKED",
 )
+RELEASE_EXAMPLES = (
+    "runewall config profile safe",
+    "runewall config validate",
+    "runewall policy audit",
+    "runewall maps lint --strict",
+    "runewall doctor",
+    "runewall release check",
+    "runewall release json-check",
+    "python -m pytest tests -v",
+)
 
 
 def _policy_audit_report(root: Path) -> dict[str, object]:
@@ -348,6 +358,8 @@ def build_parser() -> argparse.ArgumentParser:
     release_check_parser.add_argument("--json", action="store_true", dest="json_output")
     release_json_check_parser = release_subcommands.add_parser("json-check", help="Check whether the agent-facing JSON contract docs are complete.")
     release_json_check_parser.add_argument("--json", action="store_true", dest="json_output")
+    release_examples_parser = release_subcommands.add_parser("examples", help="Show curated safe release example commands.")
+    release_examples_parser.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1482,6 +1494,14 @@ def main(argv: list[str] | None = None) -> int:
             for code in report["missing_error_codes"]:
                 print(f"- docs/agent-json-schema.md is missing stable error code: {code}")
             return 1
+        if args.release_command == "examples":
+            if args.json_output:
+                print(json.dumps({"ok": True, "examples": list(RELEASE_EXAMPLES)}))
+                return 0
+            print("Release examples")
+            for example in RELEASE_EXAMPLES:
+                print(f"- {example}")
+            return 0
 
     parser.error(f"Unknown command: {args.command}")
     return 2
