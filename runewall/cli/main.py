@@ -52,6 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     maps_search_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_lint_parser = maps_subcommands.add_parser("lint", help="Lint bundled maps for quality warnings.")
     maps_lint_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_lint_parser.add_argument("--strict", action="store_true")
     maps_export_parser = maps_subcommands.add_parser("export", help="Export all bundled maps as JSON.")
     maps_export_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_stats_parser = maps_subcommands.add_parser("stats", help="Show map statistics.")
@@ -429,10 +430,13 @@ def main(argv: list[str] | None = None) -> int:
                 lint_results.append((key, site_map.site_name, warnings, errors))
 
             has_errors = total_errors > 0
+            strict = args.strict
+            should_fail = has_errors or (strict and total_warnings > 0)
 
             if args.json_output:
                 print(json.dumps({
-                    "ok": not has_errors,
+                    "strict": strict,
+                    "ok": not should_fail,
                     "warning_count": total_warnings,
                     "error_count": total_errors,
                     "results": [
@@ -445,9 +449,12 @@ def main(argv: list[str] | None = None) -> int:
                         for key, site_name, warnings, errors in lint_results
                     ],
                 }))
-                return 0 if not has_errors else 1
+                return 0 if not should_fail else 1
 
-            print("Map lint results")
+            if strict:
+                print("Map lint results (strict mode)")
+            else:
+                print("Map lint results")
             for key, _site_name, warnings, errors in lint_results:
                 issues = warnings + errors
                 if not issues:
@@ -457,7 +464,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"{key}: {label}")
                     for issue in issues:
                         print(f"  - {issue}")
-            return 0 if not has_errors else 1
+            return 0 if not should_fail else 1
         if args.maps_command == "export":
             if not args.json_output:
                 print("Use `runewall maps export --json` to export the map registry.")

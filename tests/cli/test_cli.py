@@ -2975,6 +2975,62 @@ class CliTests(unittest.TestCase):
         self.assertIn("github (GitHub)\tOK", output.getvalue())
         self.assertIn("slack (Slack)\tOK", output.getvalue())
 
+    def test_maps_lint_exits_zero_with_no_warnings_or_errors(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "lint"])
+        self.assertEqual(exit_code, 0)
+
+    def test_maps_lint_json_includes_strict_false(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "lint", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["strict"])
+        self.assertTrue(data["ok"])
+
+    def test_maps_lint_strict_exits_zero_when_maps_are_clean(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "lint", "--strict"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("strict mode", output.getvalue())
+
+    @patch("runewall.cli.main.lint_map", return_value=(["some warning"], []))
+    def test_maps_lint_normal_exits_zero_when_only_warnings(self, _mocked) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "lint"])
+        self.assertEqual(exit_code, 0)
+
+    @patch("runewall.cli.main.lint_map", return_value=(["some warning"], []))
+    def test_maps_lint_strict_exits_nonzero_when_warnings_exist(self, _mocked) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "lint", "--strict"])
+        self.assertEqual(exit_code, 1)
+
+    def test_maps_lint_strict_json_includes_strict_true(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "lint", "--strict", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["strict"])
+        self.assertTrue(data["ok"])
+
+    @patch("runewall.cli.main.lint_map", return_value=(["some warning"], []))
+    def test_maps_lint_strict_json_ok_false_when_warnings_exist(self, _mocked) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "lint", "--strict", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["strict"])
+        self.assertFalse(data["ok"])
+        self.assertGreater(data["warning_count"], 0)
+
     def test_maps_lint_runs_successfully_on_bundled_maps(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
