@@ -150,5 +150,61 @@ class ConfigSetTests(unittest.TestCase):
         self.assertIn("Invalid integer for safety.max_snapshot_mb", str(context.exception))
 
 
+class ConfigRulesTests(unittest.TestCase):
+    def test_load_config_rules_default_to_none_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cfg = load_config(Path(temp_dir))
+            self.assertIsNone(cfg.rules.file_write)
+            self.assertIsNone(cfg.rules.file_delete)
+            self.assertIsNone(cfg.rules.unknown)
+
+    def test_load_config_reads_rules_from_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = config_path(root)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                '[rules]\nfile_write = "review"\nfile_delete = "block"\nunknown = "auto"\n',
+                encoding="utf-8",
+            )
+            cfg = load_config(root)
+            self.assertEqual(cfg.rules.file_write, "review")
+            self.assertEqual(cfg.rules.file_delete, "block")
+            self.assertEqual(cfg.rules.unknown, "auto")
+
+    def test_validate_accepts_valid_rules(self) -> None:
+        from runewall.core.config import validate_config_data
+        errors = validate_config_data({"rules": {"file_write": "review", "unknown": "block"}})
+        self.assertEqual(errors, [])
+
+    def test_validate_rejects_invalid_policy_value(self) -> None:
+        from runewall.core.config import validate_config_data
+        errors = validate_config_data({"rules": {"file_write": "danger"}})
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["key"], "rules.file_write")
+        self.assertIn("must be one of", errors[0]["message"])
+
+    def test_validate_rejects_unknown_rule_key(self) -> None:
+        from runewall.core.config import validate_config_data
+        errors = validate_config_data({"rules": {"delete_everything": "auto"}})
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["key"], "rules.delete_everything")
+        self.assertIn("not a known rule key", errors[0]["message"])
+
+    def test_validate_accepts_all_valid_policy_values(self) -> None:
+        from runewall.core.config import validate_config_data
+        for policy in ("auto", "snapshot", "review", "block"):
+            errors = validate_config_data({"rules": {"file_write": policy}})
+            self.assertEqual(errors, [], f"Policy {policy!r} should be valid")
+
+    def test_set_config_value_does_not_write_none_rules_to_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("maps.allow_execute", "true", root=root)
+            content = config_path(root).read_text(encoding="utf-8")
+            self.assertNotIn('"None"', content)
+            self.assertNotIn("file_read", content)
+
+
 if __name__ == "__main__":
     unittest.main()

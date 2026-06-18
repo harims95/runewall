@@ -4288,6 +4288,113 @@ class CliTests(unittest.TestCase):
                 os.chdir(original_cwd)
             self.assertTrue(db_path.exists())
 
+    def test_config_validate_passes_with_valid_rules_section(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text(
+                    '[rules]\nfile_write = "review"\nunknown = "block"\n',
+                    encoding="utf-8",
+                )
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Config: OK", output.getvalue())
+
+    def test_config_validate_rejects_invalid_rule_policy_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text(
+                    '[rules]\nfile_write = "danger"\n',
+                    encoding="utf-8",
+                )
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("INVALID", rendered)
+        self.assertIn("rules.file_write", rendered)
+
+    def test_config_validate_rejects_unknown_rule_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text(
+                    '[rules]\ndelete_everything = "auto"\n',
+                    encoding="utf-8",
+                )
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("INVALID", rendered)
+        self.assertIn("rules.delete_everything", rendered)
+
+    def test_config_validate_json_returns_structured_errors_for_invalid_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text(
+                    '[rules]\nfile_write = "danger"\n',
+                    encoding="utf-8",
+                )
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any(e["key"] == "rules.file_write" for e in data["errors"]))
+
+    def test_config_profile_safe_keeps_maps_allow_execute_false(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+            finally:
+                os.chdir(original_cwd)
+            from runewall.core.config import load_config
+            self.assertFalse(load_config(Path(temp_dir)).maps.allow_execute)
+
+    def test_config_profile_agent_makes_file_write_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "agent"])
+            finally:
+                os.chdir(original_cwd)
+            from runewall.core.config import load_config
+            cfg = load_config(Path(temp_dir))
+            self.assertEqual(cfg.rules.file_write, "review")
+            self.assertFalse(cfg.maps.allow_execute)
+
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
     def test_doctor_custom_vercel_token_env_changes_human_label(self, mocked_find_spec) -> None:

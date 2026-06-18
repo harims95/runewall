@@ -48,12 +48,32 @@ class AuthConfig:
     cloudflare_api_token_env: str = "CLOUDFLARE_API_TOKEN"
 
 
+_VALID_RULE_KEYS: frozenset[str] = frozenset({
+    "file_read", "file_write", "file_create", "file_delete",
+    "web_read", "map_dry_run", "map_execute", "unknown",
+})
+_VALID_RULE_POLICIES: frozenset[str] = frozenset({"auto", "snapshot", "review", "block"})
+
+
+@dataclass(frozen=True)
+class RulesConfig:
+    file_read: str | None = None
+    file_write: str | None = None
+    file_create: str | None = None
+    file_delete: str | None = None
+    web_read: str | None = None
+    map_dry_run: str | None = None
+    map_execute: str | None = None
+    unknown: str | None = None
+
+
 @dataclass(frozen=True)
 class RunewallConfig:
     safety: SafetyConfig = SafetyConfig()
     retention: RetentionConfig = RetentionConfig()
     maps: MapsConfig = MapsConfig()
     auth: AuthConfig = AuthConfig()
+    rules: RulesConfig = RulesConfig()
 
     def to_dict(self) -> dict[str, dict[str, Any]]:
         return asdict(self)
@@ -75,6 +95,15 @@ vercel_token_env = "VERCEL_TOKEN"
 netlify_token_env = "NETLIFY_TOKEN"
 supabase_access_token_env = "SUPABASE_ACCESS_TOKEN"
 cloudflare_api_token_env = "CLOUDFLARE_API_TOKEN"
+
+[rules]
+file_write = "snapshot"
+file_create = "snapshot"
+file_delete = "review"
+web_read = "auto"
+map_dry_run = "auto"
+map_execute = "review"
+unknown = "review"
 """
 
 _PROFILE_DEV_TEXT = """\
@@ -94,12 +123,49 @@ vercel_token_env = "VERCEL_TOKEN"
 netlify_token_env = "NETLIFY_TOKEN"
 supabase_access_token_env = "SUPABASE_ACCESS_TOKEN"
 cloudflare_api_token_env = "CLOUDFLARE_API_TOKEN"
+
+[rules]
+file_write = "snapshot"
+file_create = "snapshot"
+file_delete = "review"
+web_read = "auto"
+map_dry_run = "auto"
+map_execute = "review"
+unknown = "review"
+"""
+
+_PROFILE_AGENT_TEXT = """\
+[safety]
+default_policy = "review"
+max_snapshot_mb = 500
+
+[retention]
+snapshot_days = 30
+
+[maps]
+allow_execute = false
+
+[auth]
+github_token_env = "GITHUB_TOKEN"
+vercel_token_env = "VERCEL_TOKEN"
+netlify_token_env = "NETLIFY_TOKEN"
+supabase_access_token_env = "SUPABASE_ACCESS_TOKEN"
+cloudflare_api_token_env = "CLOUDFLARE_API_TOKEN"
+
+[rules]
+file_write = "review"
+file_create = "review"
+file_delete = "review"
+web_read = "auto"
+map_dry_run = "auto"
+map_execute = "review"
+unknown = "review"
 """
 
 CONFIG_PROFILES: dict[str, str] = {
     "safe": RESET_CONFIG_TEXT,
     "dev": _PROFILE_DEV_TEXT,
-    "agent": RESET_CONFIG_TEXT,
+    "agent": _PROFILE_AGENT_TEXT,
 }
 
 _VALID_DEFAULT_POLICIES = {"auto", "review", "snapshot"}
@@ -135,6 +201,14 @@ def validate_config_data(data: dict[str, Any]) -> list[dict[str, str]]:
             val = auth.get(env_key)
             if val is not None and not isinstance(val, str):
                 errors.append({"key": f"auth.{env_key}", "message": "must be a string"})
+
+    rules_section = data.get("rules", {})
+    if isinstance(rules_section, dict):
+        for key, val in rules_section.items():
+            if key not in _VALID_RULE_KEYS:
+                errors.append({"key": f"rules.{key}", "message": "is not a known rule key"})
+            elif val is not None and val not in _VALID_RULE_POLICIES:
+                errors.append({"key": f"rules.{key}", "message": "must be one of: auto, snapshot, review, block"})
 
     return errors
 
@@ -206,6 +280,7 @@ def load_config(root: Path | None = None) -> RunewallConfig:
         retention=_load_retention(raw_data.get("retention")),
         maps=_load_maps(raw_data.get("maps")),
         auth=_load_auth(raw_data.get("auth")),
+        rules=_load_rules(raw_data.get("rules")),
     )
 
 
@@ -241,10 +316,12 @@ def format_config(config: RunewallConfig) -> str:
 def format_config_data(data: dict[str, dict[str, Any]]) -> str:
     lines: list[str] = []
     for section_name, section_values in _redact_mapping(data).items():
-        lines.append(f"[{section_name}]")
-        for key, value in section_values.items():
-            lines.append(f"{key} = {_format_toml_value(value)}")
-        lines.append("")
+        non_none = {k: v for k, v in section_values.items() if v is not None}
+        if non_none:
+            lines.append(f"[{section_name}]")
+            for key, value in non_none.items():
+                lines.append(f"{key} = {_format_toml_value(value)}")
+            lines.append("")
     return "\n".join(lines).rstrip()
 
 
@@ -281,6 +358,26 @@ def _load_auth(data: Any) -> AuthConfig:
     )
 
 
+def _load_rules(data: Any) -> RulesConfig:
+    section = data if isinstance(data, dict) else {}
+    return RulesConfig(
+        file_read=_as_valid_rule_policy(section.get("file_read")),
+        file_write=_as_valid_rule_policy(section.get("file_write")),
+        file_create=_as_valid_rule_policy(section.get("file_create")),
+        file_delete=_as_valid_rule_policy(section.get("file_delete")),
+        web_read=_as_valid_rule_policy(section.get("web_read")),
+        map_dry_run=_as_valid_rule_policy(section.get("map_dry_run")),
+        map_execute=_as_valid_rule_policy(section.get("map_execute")),
+        unknown=_as_valid_rule_policy(section.get("unknown")),
+    )
+
+
+def _as_valid_rule_policy(value: Any) -> str | None:
+    if isinstance(value, str) and value in _VALID_RULE_POLICIES:
+        return value
+    return None
+
+
 def _as_str(value: Any, default: str) -> str:
     return value if isinstance(value, str) and value.strip() else default
 
@@ -296,10 +393,12 @@ def _as_bool(value: Any, default: bool) -> bool:
 def _format_config_for_file(data: dict[str, dict[str, Any]]) -> str:
     lines: list[str] = []
     for section_name, section_values in data.items():
-        lines.append(f"[{section_name}]")
-        for field_key, value in section_values.items():
-            lines.append(f"{field_key} = {_format_toml_value(value)}")
-        lines.append("")
+        non_none = {k: v for k, v in section_values.items() if v is not None}
+        if non_none:
+            lines.append(f"[{section_name}]")
+            for field_key, value in non_none.items():
+                lines.append(f"{field_key} = {_format_toml_value(value)}")
+            lines.append("")
     return "\n".join(lines).rstrip()
 
 

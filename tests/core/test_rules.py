@@ -76,5 +76,46 @@ class RulesEngineTests(unittest.TestCase):
         self.assertEqual(policy, BLOCK)
 
 
+class RulesFromConfigTests(unittest.TestCase):
+    def test_default_behavior_unchanged_without_rules_config(self) -> None:
+        from runewall.core.config import RunewallConfig
+        from runewall.core.rules import engine_from_config
+        engine = engine_from_config(RunewallConfig())
+        self.assertEqual(engine.evaluate(Action(action_type="file.write", target="f")), SNAPSHOT)
+        self.assertEqual(engine.evaluate(Action(action_type="file.delete", target="f")), REVIEW)
+        self.assertEqual(engine.evaluate(Action(action_type="calendar.invite", target="t")), REVIEW)
+
+    def test_file_write_review_overrides_default_snapshot(self) -> None:
+        from runewall.core.config import RulesConfig, RunewallConfig
+        from runewall.core.rules import engine_from_config
+        engine = engine_from_config(RunewallConfig(rules=RulesConfig(file_write="review")))
+        self.assertEqual(engine.evaluate(Action(action_type="file.write", target="f")), REVIEW)
+
+    def test_file_delete_block_blocks_delete(self) -> None:
+        from runewall.core.config import RulesConfig, RunewallConfig
+        from runewall.core.rules import engine_from_config
+        engine = engine_from_config(RunewallConfig(rules=RulesConfig(file_delete="block")))
+        self.assertEqual(engine.evaluate(Action(action_type="file.delete", target="f")), BLOCK)
+
+    def test_unknown_block_blocks_unknown_actions(self) -> None:
+        from runewall.core.config import RulesConfig, RunewallConfig
+        from runewall.core.rules import engine_from_config
+        engine = engine_from_config(RunewallConfig(rules=RulesConfig(unknown="block")))
+        self.assertEqual(engine.evaluate(Action(action_type="calendar.invite", target="t")), BLOCK)
+        self.assertEqual(engine.evaluate(Action(action_type="sms.send", target="t")), BLOCK)
+
+    def test_unknown_block_does_not_affect_default_policy_actions(self) -> None:
+        from runewall.core.config import RulesConfig, RunewallConfig
+        from runewall.core.rules import engine_from_config
+        engine = engine_from_config(RunewallConfig(rules=RulesConfig(unknown="block")))
+        self.assertEqual(engine.evaluate(Action(action_type="file.write", target="f")), SNAPSHOT)
+        self.assertEqual(engine.evaluate(Action(action_type="file.delete", target="f")), REVIEW)
+
+    def test_rules_from_config_returns_empty_list_without_rules(self) -> None:
+        from runewall.core.config import RunewallConfig
+        from runewall.core.rules import rules_from_config
+        self.assertEqual(rules_from_config(RunewallConfig()), [])
+
+
 if __name__ == "__main__":
     unittest.main()
