@@ -58,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     config_set_parser = config_subcommands.add_parser("set", help="Set a config value.")
     config_set_parser.add_argument("key")
     config_set_parser.add_argument("value")
+    config_set_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
     doctor_parser.add_argument("--json", action="store_true", dest="json_output")
     pending_parser = subcommands.add_parser("pending", help="Show pending actions.")
@@ -127,8 +128,21 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 set_config_value(args.key, args.value, root=Path.cwd())
             except ValueError as error:
+                if args.json_output:
+                    print(json.dumps({"ok": False, "key": args.key, "error": str(error)}))
+                    return 1
                 print(str(error))
                 return 1
+            if args.json_output:
+                section, field = args.key.split(".", 1)
+                typed_value = getattr(getattr(load_config(Path.cwd()), section), field)
+                print(json.dumps({
+                    "ok": True,
+                    "key": args.key,
+                    "value": typed_value,
+                    "config_path": str(config_path(Path.cwd()).resolve()),
+                }))
+                return 0
             print(f"Updated config: {args.key} = {args.value}")
             return 0
     if args.command == "log":

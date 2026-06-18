@@ -1570,6 +1570,139 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("Invalid integer for safety.max_snapshot_mb", output.getvalue())
 
+    def test_config_set_json_boolean_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.allow_execute", "true", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["key"], "maps.allow_execute")
+        self.assertIs(data["value"], True)
+        self.assertIn("config_path", data)
+
+    def test_config_set_json_integer_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "safety.max_snapshot_mb", "100", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["key"], "safety.max_snapshot_mb")
+        self.assertEqual(data["value"], 100)
+        self.assertIsInstance(data["value"], int)
+
+    def test_config_set_json_creates_config_if_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.allow_execute", "true", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((Path(temp_dir) / ".runewall" / "config.toml").exists())
+            import json as _json
+            data = _json.loads(output.getvalue())
+            self.assertTrue(data["ok"])
+
+    def test_config_set_json_unknown_key_prints_json_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "unknown.key", "value", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["key"], "unknown.key")
+        self.assertIn("Unknown config key", data["error"])
+
+    def test_config_set_json_invalid_boolean_prints_json_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.allow_execute", "yes", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["key"], "maps.allow_execute")
+        self.assertIn("Invalid boolean", data["error"])
+
+    def test_config_set_json_invalid_integer_prints_json_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "safety.max_snapshot_mb", "abc", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["key"], "safety.max_snapshot_mb")
+        self.assertIn("Invalid integer", data["error"])
+
+    def test_config_set_human_output_unchanged_after_json_added(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "maps.allow_execute", "true"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(output.getvalue().strip(), "Updated config: maps.allow_execute = true")
+        self.assertNotIn("{", output.getvalue())
+
     def test_config_path_json_prints_valid_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
