@@ -1054,6 +1054,84 @@ class CliTests(unittest.TestCase):
         data = _json.loads(output.getvalue())
         self.assertEqual(data["auth"]["vercel_token"], "present")
 
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_shows_netlify_token_missing(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertIn("NETLIFY_TOKEN: missing", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"NETLIFY_TOKEN": "secret-netlify-token"}, clear=True)
+    def test_doctor_shows_netlify_token_present(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["doctor"])
+        self.assertIn("NETLIFY_TOKEN: set", output.getvalue())
+        self.assertNotIn("secret-netlify-token", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_includes_netlify_token(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("netlify_token", data["auth"])
+        self.assertEqual(data["auth"]["netlify_token"], "missing")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"NETLIFY_TOKEN": "secret-netlify-token"}, clear=True)
+    def test_doctor_json_does_not_print_netlify_token_value(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["doctor", "--json"])
+        self.assertNotIn("secret-netlify-token", output.getvalue())
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["auth"]["netlify_token"], "present")
+
+    def test_maps_stats_includes_netlify_in_real_execution(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats"])
+        self.assertIn("netlify", output.getvalue())
+        self.assertIn("Real execution:", output.getvalue())
+
+    def test_maps_stats_json_includes_netlify_in_real_execution_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("netlify", data["real_execution_maps"])
+
+    def test_maps_stats_json_does_not_include_netlify_in_dry_run_only(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertNotIn("netlify", data["dry_run_only_maps"])
+
     @patch("runewall.cli.main.execute_map_action")
     def test_act_dry_run_for_github_create_issue(self, mocked_execute) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1457,8 +1535,8 @@ class CliTests(unittest.TestCase):
                     exit_code = main(
                         [
                             "act",
-                            "netlify",
-                            "list_sites",
+                            "cloudflare",
+                            "list_zones",
                             "--execute",
                         ]
                     )
@@ -1466,7 +1544,7 @@ class CliTests(unittest.TestCase):
                 os.chdir(original_cwd)
 
         self.assertEqual(exit_code, 1)
-        self.assertEqual(output.getvalue().strip(), "Execution is not supported for netlify:list_sites.")
+        self.assertEqual(output.getvalue().strip(), "Execution is not supported for cloudflare:list_zones.")
 
     def test_status_before_init(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3256,10 +3334,12 @@ class CliTests(unittest.TestCase):
             main(["maps", "stats", "--json"])
         import json as _json
         data = _json.loads(output.getvalue())
-        for key in ("slack", "discord", "netlify", "cloudflare", "linear", "supabase"):
+        for key in ("slack", "discord", "cloudflare", "linear", "supabase"):
             self.assertIn(key, data["dry_run_only_maps"])
             self.assertNotIn(key, data["real_execution_maps"])
-        self.assertIn("vercel", data["real_execution_maps"])
+        for key in ("vercel", "netlify"):
+            self.assertIn(key, data["real_execution_maps"])
+            self.assertNotIn(key, data["dry_run_only_maps"])
         self.assertNotIn("vercel", data["dry_run_only_maps"])
 
     def test_maps_list_human_still_works_with_category_and_tags(self) -> None:
