@@ -20,6 +20,102 @@ runewall init
 pytest tests -v
 ```
 
+## Command overview
+
+All commands support `--json` for machine-readable output. Human output is the default. Tokens are never printed or stored.
+
+**Setup**
+
+```
+runewall init                  Initialize .runewall in the current directory
+runewall init --json           Same, returns JSON with database_path and config_path
+runewall version               Print version
+runewall version --json        Print version as JSON
+runewall doctor                Print a local health check
+runewall doctor --json         Same, returns JSON
+```
+
+**Action history**
+
+```
+runewall status                Show total actions, counts by status, latest action
+runewall status --json         Same, returns JSON
+runewall log                   List all recorded actions
+runewall log --json            Same, returns JSON array
+runewall pending               List pending actions awaiting review
+runewall pending --json        Same, returns JSON
+```
+
+**Safety control**
+
+```
+runewall approve ACTION_ID     Mark a pending action as approved
+runewall approve ACTION_ID --json
+runewall reject ACTION_ID      Mark a pending action as rejected
+runewall reject ACTION_ID --json
+runewall execute ACTION_ID     Execute an approved file.delete action
+runewall execute ACTION_ID --json
+runewall rollback ACTION_ID    Roll back a recorded action from its snapshot
+runewall rollback ACTION_ID --json
+runewall rollback --last       Roll back the most recent action
+runewall rollback --last --json
+```
+
+**Config**
+
+```
+runewall config path           Show the config file path
+runewall config path --json    Same, returns JSON with path and exists
+runewall config show           Print the current config (secrets redacted)
+runewall config show --json    Same, returns JSON
+runewall config set KEY VALUE  Set a config value
+runewall config set KEY VALUE --json
+```
+
+Real map execution is disabled by default. Enable it with:
+
+```bash
+runewall config set maps.allow_execute true
+```
+
+**Maps**
+
+```
+runewall maps list             List bundled site maps
+runewall maps list --json      Same, returns JSON
+runewall maps show SITE        Show flows for a site map
+runewall maps show SITE --json Same, returns JSON
+runewall maps validate         Validate bundled site maps
+runewall maps validate --json  Same, returns JSON (ok true/false)
+runewall maps path             Show the bundled maps directory
+```
+
+**Actions (dry-run and execute)**
+
+Dry-run never calls any API. It only plans.
+
+```
+runewall act github create_issue --dry-run --input repo=user/repo --input title="Bug"
+runewall act github create_issue --dry-run --json --input repo=user/repo --input title="Bug"
+runewall act github create_issue --execute --input repo=user/repo --input title="Bug"
+```
+
+`--execute` requires `maps.allow_execute = true` and `GITHUB_TOKEN` in the environment.
+
+**Read**
+
+```
+runewall read https://example.com         Fetch a URL without a browser
+runewall read https://example.com --json  Same, returns JSON with title, headings, text
+```
+
+**Cleanup**
+
+```
+runewall cleanup snapshots         Delete old snapshot directories
+runewall cleanup snapshots --json  Same, returns JSON with deleted_count and retention_days
+```
+
 ## Manual Demo
 
 ```bash
