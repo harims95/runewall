@@ -130,11 +130,37 @@ class ConfigSetTests(unittest.TestCase):
             set_config_value("auth.cloudflare_api_token_env", "MY_CF_TOKEN", root=root)
             self.assertEqual(load_config(root).auth.cloudflare_api_token_env, "MY_CF_TOKEN")
 
+    def test_set_rules_file_write_review_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("rules.file_write", "review", root=root)
+            self.assertEqual(load_config(root).rules.file_write, "review")
+
+    def test_set_rules_file_delete_block_updates_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("rules.file_delete", "block", root=root)
+            self.assertEqual(load_config(root).rules.file_delete, "block")
+
+    def test_set_rules_creates_rules_section_if_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            set_config_value("rules.file_write", "review", root=root)
+            content = config_path(root).read_text(encoding="utf-8")
+            self.assertIn("[rules]", content)
+            self.assertIn('file_write = "review"', content)
+
     def test_set_unknown_key_raises_clearly(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(ValueError) as context:
                 set_config_value("maps.unknown_key", "true", root=Path(temp_dir))
         self.assertIn("Unknown config key: maps.unknown_key", str(context.exception))
+
+    def test_set_unknown_rule_key_raises_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(ValueError) as context:
+                set_config_value("rules.delete_everything", "auto", root=Path(temp_dir))
+        self.assertIn("Unknown config key: rules.delete_everything", str(context.exception))
 
     def test_set_invalid_boolean_raises_clearly(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -148,6 +174,15 @@ class ConfigSetTests(unittest.TestCase):
             with self.assertRaises(ValueError) as context:
                 set_config_value("safety.max_snapshot_mb", "abc", root=Path(temp_dir))
         self.assertIn("Invalid integer for safety.max_snapshot_mb", str(context.exception))
+
+    def test_set_invalid_rule_value_raises_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(ValueError) as context:
+                set_config_value("rules.file_write", "danger", root=Path(temp_dir))
+        self.assertEqual(
+            str(context.exception),
+            "Invalid value for rules.file_write. Must be one of: auto, snapshot, review, block",
+        )
 
 
 class ConfigRulesTests(unittest.TestCase):

@@ -169,6 +169,7 @@ CONFIG_PROFILES: dict[str, str] = {
 }
 
 _VALID_DEFAULT_POLICIES = {"auto", "review", "snapshot"}
+_RULE_CONFIG_KEYS: frozenset[str] = frozenset(f"rules.{key}" for key in _VALID_RULE_KEYS)
 
 
 def validate_config_data(data: dict[str, Any]) -> list[dict[str, str]]:
@@ -223,6 +224,14 @@ KNOWN_CONFIG_KEYS: dict[str, type] = {
     "auth.netlify_token_env": str,
     "auth.supabase_access_token_env": str,
     "auth.cloudflare_api_token_env": str,
+    "rules.file_read": str,
+    "rules.file_write": str,
+    "rules.file_create": str,
+    "rules.file_delete": str,
+    "rules.web_read": str,
+    "rules.map_dry_run": str,
+    "rules.map_execute": str,
+    "rules.unknown": str,
 }
 
 
@@ -262,6 +271,10 @@ def set_config_value(key: str, raw_value: str, root: Path | None = None) -> None
         except ValueError:
             raise ValueError(f"Invalid integer for {key}: {raw_value!r}.")
     else:
+        if key in _RULE_CONFIG_KEYS and raw_value not in _VALID_RULE_POLICIES:
+            raise ValueError(
+                f"Invalid value for {key}. Must be one of: auto, snapshot, review, block"
+            )
         parsed = raw_value
 
     ensure_config(root)

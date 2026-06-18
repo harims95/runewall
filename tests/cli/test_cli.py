@@ -4114,6 +4114,77 @@ class CliTests(unittest.TestCase):
                 os.chdir(original_cwd)
         self.assertEqual(exit_code, 0)
 
+    def test_config_set_rules_file_write_review_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                exit_code = main(["config", "set", "rules.file_write", "review"])
+            finally:
+                os.chdir(original_cwd)
+            from runewall.core.config import load_config
+            cfg = load_config(Path(temp_dir))
+            self.assertEqual(cfg.rules.file_write, "review")
+        self.assertEqual(exit_code, 0)
+
+    def test_config_set_rules_file_delete_block_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                exit_code = main(["config", "set", "rules.file_delete", "block"])
+            finally:
+                os.chdir(original_cwd)
+            from runewall.core.config import load_config
+            cfg = load_config(Path(temp_dir))
+            self.assertEqual(cfg.rules.file_delete, "block")
+        self.assertEqual(exit_code, 0)
+
+    def test_config_set_rules_creates_rules_section_if_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                exit_code = main(["config", "set", "rules.file_write", "review"])
+            finally:
+                os.chdir(original_cwd)
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            content = config_file.read_text(encoding="utf-8")
+            self.assertIn("[rules]", content)
+            self.assertIn('file_write = "review"', content)
+        self.assertEqual(exit_code, 0)
+
+    def test_config_set_invalid_rule_value_fails_clearly(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["config", "set", "rules.file_write", "danger"])
+        self.assertEqual(exit_code, 1)
+        self.assertIn(
+            "Invalid value for rules.file_write. Must be one of: auto, snapshot, review, block",
+            output.getvalue(),
+        )
+
+    def test_config_set_invalid_rule_value_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["config", "set", "rules.file_write", "danger", "--json"])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["key"], "rules.file_write")
+        self.assertEqual(
+            data["error"],
+            "Invalid value for rules.file_write. Must be one of: auto, snapshot, review, block",
+        )
+
+    def test_config_set_unknown_rule_key_fails(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["config", "set", "rules.delete_everything", "auto"])
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Unknown config key: rules.delete_everything", output.getvalue())
+
     def test_config_show_includes_custom_vercel_token_env(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
@@ -4300,6 +4371,20 @@ class CliTests(unittest.TestCase):
                     '[rules]\nfile_write = "review"\nunknown = "block"\n',
                     encoding="utf-8",
                 )
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Config: OK", output.getvalue())
+
+    def test_config_validate_passes_after_valid_rule_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.file_write", "review"])
                 with redirect_stdout(output):
                     exit_code = main(["config", "validate"])
             finally:
@@ -4516,6 +4601,21 @@ class CliTests(unittest.TestCase):
         self.assertIn("Policy: snapshot", output.getvalue())
         self.assertIn("Source: config rule", output.getvalue())
 
+    def test_policy_explain_reflects_updated_rules_file_write(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.file_write", "review"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: review", output.getvalue())
+        self.assertIn('Reason: rules.file_write = "review"', output.getvalue())
+
     def test_policy_explain_without_rules_still_explains_default_behavior(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
@@ -4630,6 +4730,20 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["policies"]["unknown"]["policy"], "block")
         self.assertEqual(data["policies"]["unknown"]["source"], "config_rule")
         self.assertEqual(data["policies"]["unknown"]["reason"], 'rules.unknown = "block"')
+
+    def test_policy_list_reflects_updated_rules_file_delete(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.file_delete", "block"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "list"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("file.delete: block", output.getvalue())
 
     def test_policy_list_without_rules_lists_default_policies(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
