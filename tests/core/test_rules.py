@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.core.models import Action, Rule
-from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine, explain_policy, list_policies
+from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine, decision_for_policy, explain_policy, list_policies
 
 
 class RulesEngineTests(unittest.TestCase):
@@ -170,6 +170,12 @@ class RulesFromConfigTests(unittest.TestCase):
         policies = list_policies(RunewallConfig(rules=RulesConfig(unknown="block")))
         self.assertEqual(policies["unknown"].policy, BLOCK)
         self.assertEqual(policies["unknown"].reason, 'rules.unknown = "block"')
+
+    def test_decision_for_policy_maps_expected_labels(self) -> None:
+        self.assertEqual(decision_for_policy(AUTO), "allow")
+        self.assertEqual(decision_for_policy(SNAPSHOT), "snapshot_required")
+        self.assertEqual(decision_for_policy(REVIEW), "review_required")
+        self.assertEqual(decision_for_policy(BLOCK), "blocked")
 
 
 if __name__ == "__main__":

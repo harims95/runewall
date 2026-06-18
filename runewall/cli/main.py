@@ -19,7 +19,7 @@ from runewall.maps.planner import DryRunPlanner, dry_run_result, missing_inputs_
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
 from runewall.core.models import Action
 from runewall.core.rollback import RollbackEngine
-from runewall.core.rules import explain_policy, list_policies
+from runewall.core.rules import decision_for_policy, explain_policy, list_policies
 from runewall.core.snapshot import cleanup_snapshots
 from runewall.translate import read_url
 
@@ -88,6 +88,9 @@ def build_parser() -> argparse.ArgumentParser:
     policy_explain_parser.add_argument("--json", action="store_true", dest="json_output")
     policy_list_parser = policy_subcommands.add_parser("list", help="List effective policies for standard action types.")
     policy_list_parser.add_argument("--json", action="store_true", dest="json_output")
+    policy_test_parser = policy_subcommands.add_parser("test", help="Show the effective policy decision for an action type.")
+    policy_test_parser.add_argument("action_type")
+    policy_test_parser.add_argument("--json", action="store_true", dest="json_output")
     version_parser = subcommands.add_parser("version", help="Print Runewall version.")
     version_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
@@ -251,6 +254,25 @@ def main(argv: list[str] | None = None) -> int:
             print("Policy rules")
             for action_type, explanation in policies.items():
                 print(f"{action_type}: {explanation.policy_name}")
+            return 0
+        if args.policy_command == "test":
+            explanation = explain_policy(args.action_type, load_config(Path.cwd()))
+            decision = decision_for_policy(explanation.policy)
+            if args.json_output:
+                print(json.dumps({
+                    "ok": True,
+                    "action_type": explanation.action_type,
+                    "policy": explanation.policy_name,
+                    "decision": decision,
+                    "source": explanation.source,
+                    "reason": explanation.reason,
+                }))
+                return 0
+            print(f"Action: {explanation.action_type}")
+            print(f"Policy: {explanation.policy_name}")
+            print(f"Decision: {decision}")
+            print(f"Source: {explanation.source_label}")
+            print(f"Reason: {explanation.reason}")
             return 0
     if args.command == "log":
         log = ActionLog(root=Path.cwd())

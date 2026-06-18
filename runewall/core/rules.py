@@ -39,6 +39,12 @@ _POLICY_MAP: dict[str, RulePolicy] = {
     "review": REVIEW,
     "block": BLOCK,
 }
+_DECISION_MAP: dict[RulePolicy, str] = {
+    AUTO: "allow",
+    SNAPSHOT: "snapshot_required",
+    REVIEW: "review_required",
+    BLOCK: "blocked",
+}
 
 _ACTION_FIELD_MAP: dict[str, str] = {action_type: field_name for field_name, action_type in _ACTION_TYPE_MAP.items()}
 _SOURCE_LABELS: dict[str, str] = {
@@ -190,3 +196,8 @@ def list_policies(config: RunewallConfig) -> dict[str, PolicyExplanation]:
             )
         policies[action_type] = explanation
     return policies
+
+
+def decision_for_policy(policy: RulePolicy) -> str:
+    """Map a policy to the effective decision label used by the CLI."""
+    return _DECISION_MAP[policy]

@@ -4616,6 +4616,97 @@ class CliTests(unittest.TestCase):
         self.assertIn("Policy: review", output.getvalue())
         self.assertIn('Reason: rules.file_write = "review"', output.getvalue())
 
+    def test_policy_test_is_accepted_by_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "test", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Action: file.write", output.getvalue())
+
+    def test_policy_test_file_write_works(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "test", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: snapshot", rendered)
+        self.assertIn("Decision: snapshot_required", rendered)
+        self.assertIn("Source: default rule", rendered)
+
+    def test_policy_test_file_write_json_returns_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "test", "file.write", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_type"], "file.write")
+        self.assertEqual(data["policy"], "snapshot")
+        self.assertEqual(data["decision"], "snapshot_required")
+
+    def test_policy_test_after_safe_profile_gives_snapshot_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "test", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Decision: snapshot_required", output.getvalue())
+
+    def test_policy_test_after_agent_profile_gives_review_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "agent"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "test", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Decision: review_required", output.getvalue())
+
+    def test_policy_test_rules_file_delete_block_gives_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.file_delete", "block"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "test", "file.delete"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: block", rendered)
+        self.assertIn("Decision: blocked", rendered)
+
     def test_policy_explain_without_rules_still_explains_default_behavior(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
