@@ -38,6 +38,91 @@ class CliTests(unittest.TestCase):
             self.assertTrue((Path(temp_dir) / ".runewall" / "config.toml").exists())
             self.assertIn("Initialized Runewall at", output.getvalue())
 
+    def test_init_json_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["init", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["initialized"])
+        self.assertIn("database_path", data)
+        self.assertIn("config_path", data)
+
+    def test_init_json_creates_database_and_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["init", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertTrue((Path(temp_dir) / ".runewall" / "runewall.db").exists())
+            self.assertTrue((Path(temp_dir) / ".runewall" / "config.toml").exists())
+
+    def test_init_json_does_not_overwrite_existing_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                config_file.write_text("[custom]\nvalue = true\n", encoding="utf-8")
+                main(["init", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+            self.assertEqual(
+                config_file.read_text(encoding="utf-8"),
+                "[custom]\nvalue = true\n",
+            )
+
+    def test_init_json_idempotent_returns_ok_when_already_initialized(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["init", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["initialized"])
+
+    def test_init_human_output_unchanged_after_json_added(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["init"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Initialized Runewall at", output.getvalue())
+        self.assertNotIn("{", output.getvalue())
+
     def test_config_path_works(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

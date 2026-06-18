@@ -28,7 +28,8 @@ NOT_INITIALIZED_MESSAGE = "Runewall is not initialized. Run `runewall init` firs
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="runewall")
     subcommands = parser.add_subparsers(dest="command", required=True)
-    subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
+    init_parser = subcommands.add_parser("init", help="Initialize .runewall in the current directory.")
+    init_parser.add_argument("--json", action="store_true", dest="json_output")
     log_parser = subcommands.add_parser("log", help="Show recorded actions.")
     log_parser.add_argument("--json", action="store_true", dest="json_output")
     act_parser = subcommands.add_parser("act", help="Plan a mapped site flow.")
@@ -93,6 +94,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "init":
         db_path = initialize_database(Path.cwd())
         ensure_config(Path.cwd())
+        if args.json_output:
+            print(json.dumps({
+                "ok": True,
+                "initialized": True,
+                "database_path": str(db_path),
+                "config_path": str(config_path(Path.cwd()).resolve()),
+            }))
+            return 0
         print(f"Initialized Runewall at {db_path}")
         return 0
     if args.command == "config":
