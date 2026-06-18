@@ -158,7 +158,7 @@ A map without execution is still useful. Users and agents can use it for plannin
 
 ## Discovering maps
 
-Category and tags make maps discoverable by agents and automation tools without reading every map file manually.
+Category and tags make maps discoverable by agents and automation tools without reading every map file manually. Filtering and searching never execute anything — they only read map metadata.
 
 Filter by category:
 
@@ -194,9 +194,11 @@ runewall maps list --category deployment --json
 runewall maps search deploy --json
 ```
 
-`maps search QUERY --json` returns `{"query": "...", "count": N, "maps": [...]}`.
+`maps search QUERY --json` returns `{"query": "...", "count": N, "maps": [...]}`. JSON output is available for automation.
 
 If nothing matches, count is 0 and maps is an empty array.
+
+Dry-run planning also never calls external APIs. It only reads the map, validates inputs, and shows a plan.
 
 ---
 

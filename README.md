@@ -331,7 +331,7 @@ runewall maps list --tag chat
 runewall maps list --category deployment --json
 ```
 
-Categories group maps by purpose (`deployment`, `communication`, `development`, `infrastructure`, `backend`, `project_management`). Tags help agents discover maps by capability.
+Categories group maps by purpose (`deployment`, `communication`, `development`, `infrastructure`, `backend`, `project_management`). Tags help agents discover maps by capability. Filtering and searching never execute anything — they only read map metadata.
 
 Search across map key, site name, category, tags, flow names, and flow descriptions:
 
@@ -341,7 +341,9 @@ runewall maps search chat
 runewall maps search unknown --json
 ```
 
-`maps search QUERY --json` returns `{"query": "...", "count": N, "maps": [...]}`. Count is 0 and maps is empty if nothing matches.
+`maps search QUERY --json` returns `{"query": "...", "count": N, "maps": [...]}`. Count is 0 and maps is empty if nothing matches. JSON output is available for automation.
+
+Dry-run planning also never calls external APIs. It only reads the map, validates inputs, and shows a plan.
 
 Plan a mapped action safely with:
 
