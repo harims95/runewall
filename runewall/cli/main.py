@@ -39,11 +39,14 @@ def build_parser() -> argparse.ArgumentParser:
     act_parser.add_argument("--input", action="append", default=[])
     maps_parser = subcommands.add_parser("maps", help="Inspect bundled site maps.")
     maps_subcommands = maps_parser.add_subparsers(dest="maps_command", required=True)
-    maps_subcommands.add_parser("list", help="List bundled site maps.")
+    maps_list_parser = maps_subcommands.add_parser("list", help="List bundled site maps.")
+    maps_list_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_subcommands.add_parser("path", help="Show the bundled site maps directory.")
-    maps_subcommands.add_parser("validate", help="Validate bundled site maps.")
+    maps_validate_parser = maps_subcommands.add_parser("validate", help="Validate bundled site maps.")
+    maps_validate_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
+    maps_show_parser.add_argument("--json", action="store_true", dest="json_output")
     config_parser = subcommands.add_parser("config", help="Inspect local Runewall config.")
     config_subcommands = config_parser.add_subparsers(dest="config_command", required=True)
     config_subcommands.add_parser("path", help="Show the local config path.")
@@ -236,6 +239,22 @@ def main(argv: list[str] | None = None) -> int:
         registry = SiteMapRegistry()
         if args.maps_command == "list":
             site_maps = registry.list_maps()
+
+            if args.json_output:
+                print(json.dumps({
+                    "maps": [
+                        {
+                            "key": site_map.raw.get("_filename", "").removesuffix(".json"),
+                            "site_name": site_map.site_name,
+                            "base_url": site_map.base_url,
+                            "flow_count": len(site_map.flows),
+                            "flows": list(site_map.flows.keys()),
+                        }
+                        for site_map in site_maps
+                    ]
+                }))
+                return 0
+
             if not site_maps:
                 print("No bundled site maps found.")
                 return 0
@@ -261,13 +280,28 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.maps_command == "validate":
             results = registry.validate_bundled_maps()
-            all_valid = True
+            all_valid = all(r.ok for r in results)
+
+            if args.json_output:
+                print(json.dumps({
+                    "ok": all_valid,
+                    "results": [
+                        {
+                            "key": result.site_key,
+                            "site_name": result.site_name,
+                            "ok": result.ok,
+                            "error": result.error,
+                        }
+                        for result in results
+                    ]
+                }))
+                return 0 if all_valid else 1
+
             for result in results:
                 label = result.site_name or result.site_key
                 if result.ok:
                     print(f"{result.site_key} ({label})\tOK")
                 else:
-                    all_valid = False
                     print(f"{result.site_key} ({label})\tFAIL\t{result.error}")
             return 0 if all_valid else 1
         if args.maps_command == "show":
@@ -275,6 +309,33 @@ def main(argv: list[str] | None = None) -> int:
             if site_map is None:
                 print(f"Site map not found: {args.site}")
                 return 1
+
+            if args.json_output:
+                flows_json = []
+                for flow_name, flow_data in site_map.flows.items():
+                    required_inputs = [
+                        input_name
+                        for input_name, input_data in flow_data.get("inputs", {}).items()
+                        if input_data.get("required") is True
+                    ]
+                    flows_json.append({
+                        "name": flow_name,
+                        "description": flow_data.get("description", ""),
+                        "risk_level": flow_data.get("risk_level", ""),
+                        "reversible": flow_data.get("reversible", False),
+                        "requires_auth": flow_data.get("requires_auth", False),
+                        "required_inputs": required_inputs,
+                        "api_path": flow_data.get("api_path"),
+                    })
+                print(json.dumps({
+                    "key": site_map.raw.get("_filename", "").removesuffix(".json"),
+                    "site_name": site_map.site_name,
+                    "base_url": site_map.base_url,
+                    "map_version": site_map.map_version,
+                    "schema_version": site_map.schema_version,
+                    "flows": flows_json,
+                }))
+                return 0
 
             print(f"Site name: {site_map.site_name}")
             print(f"Base URL: {site_map.base_url}")

@@ -1460,5 +1460,107 @@ class CliTests(unittest.TestCase):
             self.assertIn("No pending actions.", output.getvalue())
 
 
+    def test_maps_list_json_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("maps", data)
+        self.assertIsInstance(data["maps"], list)
+
+    def test_maps_list_json_includes_all_bundled_sites(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "list", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        keys = {entry["key"] for entry in data["maps"]}
+        self.assertIn("github", keys)
+        self.assertIn("vercel", keys)
+        self.assertIn("netlify", keys)
+        self.assertIn("cloudflare", keys)
+        for entry in data["maps"]:
+            self.assertIn("site_name", entry)
+            self.assertIn("base_url", entry)
+            self.assertIn("flow_count", entry)
+            self.assertIn("flows", entry)
+
+    def test_maps_show_json_github_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "github", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["key"], "github")
+        self.assertEqual(data["site_name"], "GitHub")
+        self.assertIn("base_url", data)
+        self.assertIn("map_version", data)
+        self.assertIn("schema_version", data)
+        self.assertIn("flows", data)
+
+    def test_maps_show_json_github_includes_create_issue(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "show", "github", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        flow_names = [f["name"] for f in data["flows"]]
+        self.assertIn("create_issue", flow_names)
+        flow = next(f for f in data["flows"] if f["name"] == "create_issue")
+        self.assertEqual(flow["risk_level"], "low")
+        self.assertTrue(flow["reversible"])
+        self.assertTrue(flow["requires_auth"])
+        self.assertIn("repo", flow["required_inputs"])
+        self.assertIn("title", flow["required_inputs"])
+
+    def test_maps_validate_json_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("ok", data)
+        self.assertIn("results", data)
+        self.assertIsInstance(data["results"], list)
+
+    def test_maps_validate_json_returns_ok_true_for_bundled_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        for result in data["results"]:
+            self.assertTrue(result["ok"])
+            self.assertIsNone(result["error"])
+            self.assertIn("key", result)
+            self.assertIn("site_name", result)
+
+    def test_maps_normal_human_output_unchanged_after_json_added(self) -> None:
+        list_output = io.StringIO()
+        with redirect_stdout(list_output):
+            exit_code_list = main(["maps", "list"])
+        self.assertEqual(exit_code_list, 0)
+        self.assertIn("site_name\tbase_url\tflows", list_output.getvalue())
+        self.assertIn("GitHub", list_output.getvalue())
+
+        show_output = io.StringIO()
+        with redirect_stdout(show_output):
+            exit_code_show = main(["maps", "show", "github"])
+        self.assertEqual(exit_code_show, 0)
+        self.assertIn("Site name: GitHub", show_output.getvalue())
+
+        validate_output = io.StringIO()
+        with redirect_stdout(validate_output):
+            exit_code_validate = main(["maps", "validate"])
+        self.assertEqual(exit_code_validate, 0)
+        self.assertIn("github (GitHub)\tOK", validate_output.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
