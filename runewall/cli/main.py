@@ -636,13 +636,14 @@ def main(argv: list[str] | None = None) -> int:
         httpx_available = importlib.util.find_spec("httpx") is not None
         bs4_available = importlib.util.find_spec("bs4") is not None
         github_token_set = bool(os.environ.get("GITHUB_TOKEN"))
+        vercel_token_set = bool(os.environ.get("VERCEL_TOKEN"))
         maps_count = len(SiteMapRegistry().list_maps())
         config_exists = config_path(Path.cwd()).exists()
         allow_execute = load_config(Path.cwd()).maps.allow_execute
 
         if not httpx_available or not bs4_available:
             summary = "FAIL"
-        elif not db_exists or not github_token_set or allow_execute:
+        elif not db_exists or not github_token_set or not vercel_token_set or allow_execute:
             summary = "WARN"
         else:
             summary = "OK"
@@ -657,7 +658,10 @@ def main(argv: list[str] | None = None) -> int:
                     "map_execution": "ENABLED" if allow_execute else "disabled",
                 },
                 "dependencies": {"httpx": httpx_available, "bs4": bs4_available},
-                "auth": {"github_token": "present" if github_token_set else "missing"},
+                "auth": {
+                    "github_token": "present" if github_token_set else "missing",
+                    "vercel_token": "present" if vercel_token_set else "missing",
+                },
                 "maps": {"bundled_count": maps_count},
                 "summary": summary,
             }))
@@ -669,6 +673,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Dependency httpx: {'OK' if httpx_available else 'MISSING'}")
         print(f"Dependency bs4: {'OK' if bs4_available else 'MISSING'}")
         print(f"GITHUB_TOKEN: {'set' if github_token_set else 'missing'}")
+        print(f"VERCEL_TOKEN: {'set' if vercel_token_set else 'missing'}")
         print(f"Bundled maps: {maps_count}")
         print(f"Map execution: {'ENABLED' if allow_execute else 'disabled'}")
         print(f"Summary: {summary}")

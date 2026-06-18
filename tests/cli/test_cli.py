@@ -997,6 +997,63 @@ class CliTests(unittest.TestCase):
         self.assertIn("Summary:", rendered)
         self.assertNotIn("{", rendered)
 
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_shows_vercel_token_missing(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("VERCEL_TOKEN: missing", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"VERCEL_TOKEN": "secret-vercel-token"}, clear=True)
+    def test_doctor_shows_vercel_token_present(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["doctor"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("VERCEL_TOKEN: set", output.getvalue())
+        self.assertNotIn("secret-vercel-token", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_includes_vercel_token(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("vercel_token", data["auth"])
+        self.assertEqual(data["auth"]["vercel_token"], "missing")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"VERCEL_TOKEN": "secret-vercel-token"}, clear=True)
+    def test_doctor_json_does_not_print_vercel_token_value(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["doctor", "--json"])
+        self.assertNotIn("secret-vercel-token", output.getvalue())
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["auth"]["vercel_token"], "present")
+
     @patch("runewall.cli.main.execute_map_action")
     def test_act_dry_run_for_github_create_issue(self, mocked_execute) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
