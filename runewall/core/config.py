@@ -120,6 +120,10 @@ KNOWN_CONFIG_KEYS: dict[str, type] = {
     "retention.snapshot_days": int,
     "maps.allow_execute": bool,
     "auth.github_token_env": str,
+    "auth.vercel_token_env": str,
+    "auth.netlify_token_env": str,
+    "auth.supabase_access_token_env": str,
+    "auth.cloudflare_api_token_env": str,
 }
 
 

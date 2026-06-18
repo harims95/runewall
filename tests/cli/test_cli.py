@@ -4066,5 +4066,215 @@ class CliTests(unittest.TestCase):
         self.assertIn("netlify", keys)
 
 
+    def test_config_set_auth_vercel_token_env_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "set", "auth.vercel_token_env", "MY_VERCEL_TOKEN"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+
+    def test_config_set_auth_netlify_token_env_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                exit_code = main(["config", "set", "auth.netlify_token_env", "MY_NETLIFY_TOKEN"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+
+    def test_config_set_auth_supabase_access_token_env_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                exit_code = main(["config", "set", "auth.supabase_access_token_env", "MY_SUPABASE_TOKEN"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+
+    def test_config_set_auth_cloudflare_api_token_env_succeeds(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                exit_code = main(["config", "set", "auth.cloudflare_api_token_env", "MY_CF_TOKEN"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+
+    def test_config_show_includes_custom_vercel_token_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "auth.vercel_token_env", "MY_VERCEL_TOKEN"])
+                with redirect_stdout(output):
+                    exit_code = main(["config", "show"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("MY_VERCEL_TOKEN", output.getvalue())
+
+    def test_config_validate_passes_with_custom_auth_env(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "auth.vercel_token_env", "MY_VERCEL_TOKEN"])
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Config: OK", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_custom_vercel_token_env_changes_human_label(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_dir = Path(temp_dir) / ".runewall"
+                config_dir.mkdir()
+                (config_dir / "config.toml").write_text(
+                    '[auth]\nvercel_token_env = "MY_VERCEL_TOKEN"\n',
+                    encoding="utf-8",
+                )
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("MY_VERCEL_TOKEN: missing", rendered)
+        self.assertNotIn("\nVERCEL_TOKEN: missing", rendered)
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"MY_VERCEL_TOKEN": "secret-custom-tok"}, clear=True)
+    def test_doctor_custom_vercel_token_env_checks_custom_env_var(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_dir = Path(temp_dir) / ".runewall"
+                config_dir.mkdir()
+                (config_dir / "config.toml").write_text(
+                    '[auth]\nvercel_token_env = "MY_VERCEL_TOKEN"\n',
+                    encoding="utf-8",
+                )
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("MY_VERCEL_TOKEN: set", rendered)
+        self.assertNotIn("secret-custom-tok", rendered)
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_includes_configured_env_name(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_dir = Path(temp_dir) / ".runewall"
+                config_dir.mkdir()
+                (config_dir / "config.toml").write_text(
+                    '[auth]\nvercel_token_env = "MY_VERCEL_TOKEN"\n',
+                    encoding="utf-8",
+                )
+                with redirect_stdout(output):
+                    main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["auth"]["vercel"]["env"], "MY_VERCEL_TOKEN")
+        self.assertEqual(data["auth"]["vercel"]["status"], "missing")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_default_includes_structured_auth_with_env_names(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["auth"]["github"]["env"], "GITHUB_TOKEN")
+        self.assertEqual(data["auth"]["vercel"]["env"], "VERCEL_TOKEN")
+        self.assertEqual(data["auth"]["netlify"]["env"], "NETLIFY_TOKEN")
+        self.assertEqual(data["auth"]["supabase"]["env"], "SUPABASE_ACCESS_TOKEN")
+        self.assertEqual(data["auth"]["cloudflare"]["env"], "CLOUDFLARE_API_TOKEN")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_old_flat_auth_keys_still_present(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("github_token", data["auth"])
+        self.assertIn("vercel_token", data["auth"])
+        self.assertIn("netlify_token", data["auth"])
+        self.assertIn("supabase_access_token", data["auth"])
+        self.assertIn("cloudflare_api_token", data["auth"])
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_summary_warn_when_tokens_missing(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["summary"], "WARN")
+
+
 if __name__ == "__main__":
     unittest.main()

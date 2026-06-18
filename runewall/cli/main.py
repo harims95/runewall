@@ -675,14 +675,22 @@ def main(argv: list[str] | None = None) -> int:
         db_exists = database_path(Path.cwd()).exists()
         httpx_available = importlib.util.find_spec("httpx") is not None
         bs4_available = importlib.util.find_spec("bs4") is not None
-        github_token_set = bool(os.environ.get("GITHUB_TOKEN"))
-        vercel_token_set = bool(os.environ.get("VERCEL_TOKEN"))
-        netlify_token_set = bool(os.environ.get("NETLIFY_TOKEN"))
-        supabase_token_set = bool(os.environ.get("SUPABASE_ACCESS_TOKEN"))
-        cloudflare_token_set = bool(os.environ.get("CLOUDFLARE_API_TOKEN"))
         maps_count = len(SiteMapRegistry().list_maps())
         config_exists = config_path(Path.cwd()).exists()
-        allow_execute = load_config(Path.cwd()).maps.allow_execute
+        cfg = load_config(Path.cwd())
+        allow_execute = cfg.maps.allow_execute
+
+        github_env = cfg.auth.github_token_env
+        vercel_env = cfg.auth.vercel_token_env
+        netlify_env = cfg.auth.netlify_token_env
+        supabase_env = cfg.auth.supabase_access_token_env
+        cloudflare_env = cfg.auth.cloudflare_api_token_env
+
+        github_token_set = bool(os.environ.get(github_env))
+        vercel_token_set = bool(os.environ.get(vercel_env))
+        netlify_token_set = bool(os.environ.get(netlify_env))
+        supabase_token_set = bool(os.environ.get(supabase_env))
+        cloudflare_token_set = bool(os.environ.get(cloudflare_env))
 
         if not httpx_available or not bs4_available:
             summary = "FAIL"
@@ -707,6 +715,11 @@ def main(argv: list[str] | None = None) -> int:
                     "netlify_token": "present" if netlify_token_set else "missing",
                     "supabase_access_token": "present" if supabase_token_set else "missing",
                     "cloudflare_api_token": "present" if cloudflare_token_set else "missing",
+                    "github": {"env": github_env, "status": "present" if github_token_set else "missing"},
+                    "vercel": {"env": vercel_env, "status": "present" if vercel_token_set else "missing"},
+                    "netlify": {"env": netlify_env, "status": "present" if netlify_token_set else "missing"},
+                    "supabase": {"env": supabase_env, "status": "present" if supabase_token_set else "missing"},
+                    "cloudflare": {"env": cloudflare_env, "status": "present" if cloudflare_token_set else "missing"},
                 },
                 "maps": {"bundled_count": maps_count},
                 "summary": summary,
@@ -718,11 +731,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Config: {'present' if config_exists else 'missing'}")
         print(f"Dependency httpx: {'OK' if httpx_available else 'MISSING'}")
         print(f"Dependency bs4: {'OK' if bs4_available else 'MISSING'}")
-        print(f"GITHUB_TOKEN: {'set' if github_token_set else 'missing'}")
-        print(f"VERCEL_TOKEN: {'set' if vercel_token_set else 'missing'}")
-        print(f"NETLIFY_TOKEN: {'set' if netlify_token_set else 'missing'}")
-        print(f"SUPABASE_ACCESS_TOKEN: {'set' if supabase_token_set else 'missing'}")
-        print(f"CLOUDFLARE_API_TOKEN: {'set' if cloudflare_token_set else 'missing'}")
+        print(f"{github_env}: {'set' if github_token_set else 'missing'}")
+        print(f"{vercel_env}: {'set' if vercel_token_set else 'missing'}")
+        print(f"{netlify_env}: {'set' if netlify_token_set else 'missing'}")
+        print(f"{supabase_env}: {'set' if supabase_token_set else 'missing'}")
+        print(f"{cloudflare_env}: {'set' if cloudflare_token_set else 'missing'}")
         print(f"Bundled maps: {maps_count}")
         print(f"Map execution: {'ENABLED' if allow_execute else 'disabled'}")
         print(f"Summary: {summary}")
