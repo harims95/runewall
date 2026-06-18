@@ -2,6 +2,8 @@
 
 Runewall is a local-first runtime for recording agent actions safely.
 
+It is local-first, CLI-first, and does not require a hosted backend.
+
 This starter implements only the initial Python package skeleton and Week 1 core:
 
 - package metadata via `pyproject.toml`
@@ -19,6 +21,16 @@ pip install -e .[dev]
 runewall init
 pytest tests -v
 ```
+
+## Local install
+
+```bash
+python -m pip install -e ".[dev]"
+runewall version
+runewall doctor
+```
+
+Dry-run works without tokens. Tokens are only needed for real execution maps.
 
 ## Command overview
 
