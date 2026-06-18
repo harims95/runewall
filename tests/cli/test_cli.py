@@ -2975,6 +2975,64 @@ class CliTests(unittest.TestCase):
         self.assertIn("github (GitHub)\tOK", output.getvalue())
         self.assertIn("slack (Slack)\tOK", output.getvalue())
 
+    def test_maps_export_json_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "export", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("maps", data)
+        self.assertIsInstance(data["maps"], list)
+
+    def test_maps_export_json_includes_all_bundled_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "export", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        keys = {entry["key"] for entry in data["maps"]}
+        for expected in ("github", "vercel", "netlify", "cloudflare", "slack", "discord", "linear", "supabase"):
+            self.assertIn(expected, keys)
+
+    def test_maps_export_json_includes_category_and_tags(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "export", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        github = next(e for e in data["maps"] if e["key"] == "github")
+        self.assertEqual(github["category"], "development")
+        self.assertEqual(github["tags"], ["code", "issues"])
+        for entry in data["maps"]:
+            self.assertIn("category", entry)
+            self.assertIn("tags", entry)
+
+    def test_maps_export_json_includes_flows(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "export", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        github = next(e for e in data["maps"] if e["key"] == "github")
+        self.assertIsInstance(github["flows"], list)
+        self.assertEqual(len(github["flows"]), 1)
+        flow = github["flows"][0]
+        self.assertEqual(flow["name"], "create_issue")
+        self.assertIn("risk_level", flow)
+        self.assertIn("reversible", flow)
+        self.assertIn("requires_auth", flow)
+        self.assertIn("required_inputs", flow)
+        self.assertIn("api_path", flow)
+
+    def test_maps_export_without_json_prints_guidance(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "export"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("runewall maps export --json", output.getvalue())
+        self.assertNotIn("{", output.getvalue())
+
     def test_maps_stats_prints_total_maps_and_flows(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

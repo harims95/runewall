@@ -49,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     maps_search_parser = maps_subcommands.add_parser("search", help="Search bundled site maps.")
     maps_search_parser.add_argument("query")
     maps_search_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_export_parser = maps_subcommands.add_parser("export", help="Export all bundled maps as JSON.")
+    maps_export_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_stats_parser = maps_subcommands.add_parser("stats", help="Show map statistics.")
     maps_stats_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_subcommands.add_parser("path", help="Show the bundled site maps directory.")
@@ -410,6 +412,41 @@ def main(argv: list[str] | None = None) -> int:
             print("site_name\tbase_url\tflows")
             for sm in results:
                 print("\t".join([sm.site_name, sm.base_url, str(len(sm.flows))]))
+            return 0
+        if args.maps_command == "export":
+            if not args.json_output:
+                print("Use `runewall maps export --json` to export the map registry.")
+                return 0
+            site_maps = registry.list_maps()
+            export_maps = []
+            for site_map in site_maps:
+                flows_json = []
+                for flow_name, flow_data in site_map.flows.items():
+                    required_inputs = [
+                        input_name
+                        for input_name, input_data in flow_data.get("inputs", {}).items()
+                        if input_data.get("required") is True
+                    ]
+                    flows_json.append({
+                        "name": flow_name,
+                        "description": flow_data.get("description", ""),
+                        "risk_level": flow_data.get("risk_level", ""),
+                        "reversible": flow_data.get("reversible", False),
+                        "requires_auth": flow_data.get("requires_auth", False),
+                        "required_inputs": required_inputs,
+                        "api_path": flow_data.get("api_path"),
+                    })
+                export_maps.append({
+                    "key": site_map.raw.get("_filename", "").removesuffix(".json"),
+                    "site_name": site_map.site_name,
+                    "base_url": site_map.base_url,
+                    "map_version": site_map.map_version,
+                    "schema_version": site_map.schema_version,
+                    "category": site_map.category,
+                    "tags": site_map.tags,
+                    "flows": flows_json,
+                })
+            print(json.dumps({"maps": export_maps}))
             return 0
         if args.maps_command == "stats":
             site_maps = registry.list_maps()
