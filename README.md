@@ -342,6 +342,159 @@ It checks:
 - bundled maps count
 - a final `OK`, `WARN`, or `FAIL` summary
 
+## Agent-readable JSON output
+
+Runewall supports machine-readable JSON output for agents and automation.
+
+Add `--json` to any supported command and it prints valid JSON only — no headers, no decorators, no human messages.
+
+Human output is still available by omitting `--json`.
+
+Key behaviors:
+
+- JSON mode prints valid JSON only. Nothing else is written to stdout.
+- Human output remains unchanged when `--json` is not used.
+- Dry-run JSON never executes real actions. It only plans.
+- Real execution is still guarded by config (`maps.allow_execute`) and environment tokens.
+- Token values are never printed in any mode.
+
+### Supported commands
+
+**Initialize:**
+
+```bash
+runewall init --json
+```
+
+```json
+{ "ok": true, "initialized": true, "database_path": "...", "config_path": "..." }
+```
+
+**Status:**
+
+```bash
+runewall status --json
+```
+
+```json
+{ "initialized": true, "database_path": "...", "total_actions": 3, "pending_count": 1, "latest_action": { ... } }
+```
+
+**Action log:**
+
+```bash
+runewall log --json
+```
+
+```json
+[{ "id": "...", "action_type": "file.write", "target": "demo.txt", "status": "success", "params": {}, "result": {} }]
+```
+
+**Pending actions:**
+
+```bash
+runewall pending --json
+```
+
+```json
+{ "initialized": true, "pending": [{ "id": "...", "action_type": "file.delete", "status": "pending", ... }] }
+```
+
+**Maps:**
+
+```bash
+runewall maps list --json
+runewall maps show github --json
+runewall maps validate --json
+```
+
+`maps list --json` returns a list of bundled maps with flow names and counts.
+
+`maps show github --json` returns the full site map including flow metadata and required inputs.
+
+`maps validate --json` returns `{ "ok": true, "results": [...] }`. If any map is invalid, `ok` is `false` and the exit code is non-zero.
+
+**Dry-run planning:**
+
+```bash
+runewall act github create_issue --dry-run --json --input repo=user/repo --input title="Bug" --input body="Details"
+```
+
+```json
+{
+  "ok": true,
+  "executed": false,
+  "site": "github",
+  "flow": "create_issue",
+  "risk_level": "low",
+  "reversible": true,
+  "requires_auth": true,
+  "provided_inputs": { "repo": "user/repo", "title": "Bug", "body": "Details" },
+  "missing_inputs": [],
+  "api_path": null,
+  "ui_steps_count": 0
+}
+```
+
+If required inputs are missing, `ok` is `false`, `error` describes what is missing, and the exit code is non-zero.
+
+`--json` is only valid with `--dry-run`. Using `--json` with `--execute` exits non-zero with a clear error.
+
+**Config:**
+
+```bash
+runewall config path --json
+runewall config show --json
+```
+
+`config path --json` returns `{ "path": "...", "exists": true }`.
+
+`config show --json` returns the full config as a nested object. Secret-like values are redacted. If the config file is missing, defaults are returned and `"exists": false` is included.
+
+**Doctor:**
+
+```bash
+runewall doctor --json
+```
+
+```json
+{
+  "python": { "version": "3.13.0", "ok": true },
+  "database": { "present": true, "path": "..." },
+  "config": { "present": true, "path": "...", "map_execution": "disabled" },
+  "dependencies": { "httpx": true, "bs4": true },
+  "auth": { "github_token": "present" },
+  "maps": { "bundled_count": 4 },
+  "summary": "OK"
+}
+```
+
+`auth.github_token` is `"present"` or `"missing"` — the actual token is never printed.
+
+**Cleanup:**
+
+```bash
+runewall cleanup snapshots --json
+```
+
+```json
+{ "ok": true, "snapshots_directory_exists": true, "deleted_count": 2, "retention_days": 30 }
+```
+
+**Read:**
+
+```bash
+runewall read https://example.com --json
+```
+
+```json
+{ "ok": true, "url": "https://example.com", "title": "...", "headings": [...], "text": "...", "logged": true }
+```
+
+`logged` is `true` if Runewall is initialized and the action was recorded, `false` otherwise.
+
+If the read fails, `ok` is `false`, `error` describes the failure, and the exit code is non-zero.
+
 ## Not built yet
 
 - human approval/reject flow
