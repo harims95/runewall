@@ -205,9 +205,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run and args.execute:
             print("Choose only one of --dry-run or --execute.")
             return 1
-        if args.json_output and not args.dry_run:
-            print("--json requires --dry-run.")
-            return 1
 
         log = ActionLog.open_existing(root=Path.cwd())
         inputs: dict[str, str] = {}
@@ -236,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
 
         validation_error = missing_inputs_error(plan)
 
-        if args.json_output:
+        if args.json_output and args.dry_run:
             if validation_error is not None:
                 if log is not None:
                     log.add_action(
@@ -325,6 +322,9 @@ def main(argv: list[str] | None = None) -> int:
                         reversible=False,
                     )
                 )
+            if args.json_output:
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error)}))
+                return 1
             print(str(error))
             return 1
 
@@ -340,7 +340,12 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         else:
-            print("Runewall is not initialized; execution was not logged.")
+            if not args.json_output:
+                print("Runewall is not initialized; execution was not logged.")
+
+        if args.json_output:
+            print(json.dumps({"ok": True, "executed": True, "site": args.site, "flow": args.flow, "result": result}))
+            return 0
 
         if args.site.lower() == "vercel":
             print(f"Listed {result['project_count']} Vercel project(s).")

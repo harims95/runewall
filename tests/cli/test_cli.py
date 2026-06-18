@@ -2980,16 +2980,180 @@ class CliTests(unittest.TestCase):
         import json as _json
         _json.loads(output.getvalue())
 
-    def test_act_json_without_dry_run_fails_clearly(self) -> None:
-        output = io.StringIO()
-        with redirect_stdout(output):
-            exit_code = main([
-                "act", "github", "create_issue", "--execute", "--json",
-                "--input", "repo=user/repo",
-                "--input", "title=Bug",
-            ])
+    def test_act_execute_json_blocked_by_config_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "github", "create_issue", "--execute", "--json",
+                        "--input", "repo=user/repo",
+                        "--input", "title=Bug",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+
         self.assertEqual(exit_code, 1)
-        self.assertIn("--json requires --dry-run", output.getvalue())
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "github")
+        self.assertEqual(data["flow"], "create_issue")
+        self.assertIn("allow_execute", data["error"])
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_act_execute_json_missing_token_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "vercel", "list_projects", "--execute", "--json",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "vercel")
+        self.assertIn("VERCEL_TOKEN", data["error"])
+
+    @patch.dict("os.environ", {"VERCEL_TOKEN": "secret-vercel-token"}, clear=True)
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_execute_json_vercel_success(self, mocked_execute) -> None:
+        mocked_execute.return_value = {"project_count": 2, "projects": [{"id": "p1", "name": "app"}]}
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "vercel", "list_projects", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["executed"])
+        self.assertEqual(data["site"], "vercel")
+        self.assertEqual(data["result"]["project_count"], 2)
+        self.assertNotIn("secret-vercel-token", output.getvalue())
+
+    @patch.dict("os.environ", {"NETLIFY_TOKEN": "secret-netlify-token"}, clear=True)
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_execute_json_netlify_success(self, mocked_execute) -> None:
+        mocked_execute.return_value = {"site_count": 1, "sites": [{"id": "s1", "name": "site"}]}
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "netlify", "list_sites", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["executed"])
+        self.assertEqual(data["result"]["site_count"], 1)
+        self.assertNotIn("secret-netlify-token", output.getvalue())
+
+    @patch.dict("os.environ", {"SUPABASE_ACCESS_TOKEN": "secret-supabase-token"}, clear=True)
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_execute_json_supabase_success(self, mocked_execute) -> None:
+        mocked_execute.return_value = {"project_count": 3, "projects": []}
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "supabase", "list_projects", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["executed"])
+        self.assertEqual(data["result"]["project_count"], 3)
+        self.assertNotIn("secret-supabase-token", output.getvalue())
+
+    @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-github-token"}, clear=True)
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_execute_json_github_success(self, mocked_execute) -> None:
+        mocked_execute.return_value = {"issue_url": "https://github.com/u/r/issues/1", "issue_number": 1}
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "github", "create_issue", "--execute", "--json",
+                        "--input", "repo=u/r", "--input", "title=Bug",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["executed"])
+        self.assertIn("issue_url", data["result"])
+        self.assertNotIn("secret-github-token", output.getvalue())
+
+    def test_act_execute_json_unsupported_map_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[maps]\nallow_execute = true\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "cloudflare", "list_zones", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "cloudflare")
+        self.assertIn("not supported", data["error"].lower())
 
     def test_act_dry_run_human_output_unchanged_after_json_added(self) -> None:
         output = io.StringIO()
