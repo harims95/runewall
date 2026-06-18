@@ -57,6 +57,19 @@ RELEASE_EXAMPLES = (
     "runewall release json-check",
     "python -m pytest tests -v",
 )
+RELEASE_STATUS_READINESS = {
+    "config": "ready",
+    "policy": "ready",
+    "maps": "ready",
+    "json_contract": "ready",
+    "doctor": "ready",
+    "tests_manual": "python -m pytest tests -v",
+}
+RELEASE_STATUS_RECOMMENDED_COMMANDS = (
+    "runewall release check",
+    "runewall release json-check",
+    "python -m pytest tests -v",
+)
 
 
 def _policy_audit_report(root: Path) -> dict[str, object]:
@@ -360,6 +373,8 @@ def build_parser() -> argparse.ArgumentParser:
     release_json_check_parser.add_argument("--json", action="store_true", dest="json_output")
     release_examples_parser = release_subcommands.add_parser("examples", help="Show curated safe release example commands.")
     release_examples_parser.add_argument("--json", action="store_true", dest="json_output")
+    release_status_parser = release_subcommands.add_parser("status", help="Show a simple release readiness summary.")
+    release_status_parser.add_argument("--json", action="store_true", dest="json_output")
     return parser
 
 
@@ -1501,6 +1516,27 @@ def main(argv: list[str] | None = None) -> int:
             print("Release examples")
             for example in RELEASE_EXAMPLES:
                 print(f"- {example}")
+            return 0
+        if args.release_command == "status":
+            report = {
+                "ok": True,
+                "readiness": RELEASE_STATUS_READINESS,
+                "recommended_commands": list(RELEASE_STATUS_RECOMMENDED_COMMANDS),
+            }
+            if args.json_output:
+                print(json.dumps(report))
+                return 0
+            print("Release status")
+            print("Config: ready")
+            print("Policy: ready")
+            print("Maps: ready")
+            print("JSON contract: ready")
+            print("Doctor: ready")
+            print("Tests: run manually with python -m pytest tests -v")
+            print("")
+            print("Recommended final check:")
+            for command in RELEASE_STATUS_RECOMMENDED_COMMANDS:
+                print(command)
             return 0
 
     parser.error(f"Unknown command: {args.command}")

@@ -53,6 +53,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("check", rendered)
         self.assertIn("json-check", rendered)
         self.assertIn("examples", rendered)
+        self.assertIn("status", rendered)
 
     def test_maps_help_exits_zero_and_mentions_lint(self) -> None:
         output = io.StringIO()
@@ -5195,6 +5196,52 @@ class CliTests(unittest.TestCase):
             exit_code = main(["release", "examples"])
         self.assertEqual(exit_code, 0)
         self.assertIn("- runewall release json-check", output.getvalue())
+
+    def test_release_status_exists(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "status"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Release status", rendered)
+        self.assertIn("Recommended final check:", rendered)
+
+    def test_release_status_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(
+            data["readiness"],
+            {
+                "config": "ready",
+                "policy": "ready",
+                "maps": "ready",
+                "json_contract": "ready",
+                "doctor": "ready",
+                "tests_manual": "python -m pytest tests -v",
+            },
+        )
+        self.assertNotIn("Release status", output.getvalue())
+
+    def test_release_status_json_includes_recommended_commands(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(
+            data["recommended_commands"],
+            [
+                "runewall release check",
+                "runewall release json-check",
+                "python -m pytest tests -v",
+            ],
+        )
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     def test_release_check_json_returns_valid_json(self, mocked_find_spec) -> None:
