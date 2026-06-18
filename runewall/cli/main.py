@@ -28,6 +28,19 @@ EMPTY_LOG_MESSAGE = "No actions recorded yet."
 NOT_INITIALIZED_MESSAGE = "Runewall is not initialized. Run `runewall init` first."
 
 
+def _policy_audit_report(root: Path) -> dict[str, object]:
+    raw_config = load_config_data(root)
+    errors = validate_config_data(raw_config)
+    if errors:
+        return {"ok": False, "level": "INVALID", "warnings": [], "errors": errors}
+    warnings = audit_policy_config(load_config(root))
+    return {
+        "ok": not warnings,
+        "level": "OK" if not warnings else "WARN",
+        "warnings": [{"key": warning.key, "message": warning.message} for warning in warnings],
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="runewall")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -223,31 +236,25 @@ def main(argv: list[str] | None = None) -> int:
             return 0
     if args.command == "policy":
         if args.policy_command == "audit":
-            raw_config = load_config_data(Path.cwd())
-            errors = validate_config_data(raw_config)
-            if errors:
+            audit = _policy_audit_report(Path.cwd())
+            if audit["level"] == "INVALID":
                 if args.json_output:
-                    print(json.dumps({"ok": False, "level": "INVALID", "warnings": [], "errors": errors}))
+                    print(json.dumps(audit))
                     return 1
                 print("Policy audit: INVALID")
-                for error in errors:
+                for error in audit["errors"]:
                     print(f"- {error['key']} {error['message']}")
                 return 1
-            warnings = audit_policy_config(load_config(Path.cwd()))
             if args.json_output:
-                print(json.dumps({
-                    "ok": not warnings,
-                    "level": "OK" if not warnings else "WARN",
-                    "warnings": [{"key": warning.key, "message": warning.message} for warning in warnings],
-                }))
-                return 0 if not warnings else 1
-            if not warnings:
+                print(json.dumps(audit))
+                return 0 if audit["ok"] else 1
+            if audit["level"] == "OK":
                 print("Policy audit: OK")
                 print("No risky policy settings found.")
                 return 0
             print("Policy audit: WARN")
-            for warning in warnings:
-                print(f"- {warning.key} is true; {warning.message}." if warning.key == "maps.allow_execute" else f"- {warning.key} is auto; {warning.message}.")
+            for warning in audit["warnings"]:
+                print(f"- {warning['key']} is true; {warning['message']}." if warning["key"] == "maps.allow_execute" else f"- {warning['key']} is auto; {warning['message']}.")
             return 1
         if args.policy_command == "explain":
             explanation = explain_policy(args.action_type, load_config(Path.cwd()))
@@ -857,6 +864,7 @@ def main(argv: list[str] | None = None) -> int:
         maps_count = len(SiteMapRegistry().list_maps())
         config_exists = config_path(Path.cwd()).exists()
         cfg = load_config(Path.cwd())
+        policy_audit = _policy_audit_report(Path.cwd())
         allow_execute = cfg.maps.allow_execute
 
         github_env = cfg.auth.github_token_env
@@ -871,9 +879,9 @@ def main(argv: list[str] | None = None) -> int:
         supabase_token_set = bool(os.environ.get(supabase_env))
         cloudflare_token_set = bool(os.environ.get(cloudflare_env))
 
-        if not httpx_available or not bs4_available:
+        if not httpx_available or not bs4_available or policy_audit["level"] == "INVALID":
             summary = "FAIL"
-        elif not db_exists or not github_token_set or not vercel_token_set or not netlify_token_set or not supabase_token_set or not cloudflare_token_set or allow_execute:
+        elif not db_exists or not github_token_set or not vercel_token_set or not netlify_token_set or not supabase_token_set or not cloudflare_token_set or allow_execute or policy_audit["level"] == "WARN":
             summary = "WARN"
         else:
             summary = "OK"
@@ -901,6 +909,7 @@ def main(argv: list[str] | None = None) -> int:
                     "cloudflare": {"env": cloudflare_env, "status": "present" if cloudflare_token_set else "missing"},
                 },
                 "maps": {"bundled_count": maps_count},
+                "policy_audit": policy_audit,
                 "summary": summary,
             }))
             return 0
@@ -917,6 +926,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{cloudflare_env}: {'set' if cloudflare_token_set else 'missing'}")
         print(f"Bundled maps: {maps_count}")
         print(f"Map execution: {'ENABLED' if allow_execute else 'disabled'}")
+        print(f"Policy audit: {policy_audit['level']}")
+        if policy_audit["level"] == "WARN":
+            for warning in policy_audit["warnings"]:
+                print(f"- {warning['key']} is true; {warning['message']}." if warning["key"] == "maps.allow_execute" else f"- {warning['key']} is auto; {warning['message']}.")
+        if policy_audit["level"] == "INVALID":
+            for error in policy_audit["errors"]:
+                print(f"- {error['key']}: {error['message']}")
         print(f"Summary: {summary}")
         return 0
     if args.command == "pending":

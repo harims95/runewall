@@ -810,6 +810,20 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertIn("Map execution: disabled", rendered)
 
+    def test_doctor_includes_policy_audit_ok_for_safe_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy audit: OK", output.getvalue())
+
     def test_doctor_shows_map_execution_enabled_when_config_set(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
@@ -848,6 +862,8 @@ class CliTests(unittest.TestCase):
             self.assertEqual(exit_code, 0)
             self.assertIn("Map execution: ENABLED", rendered)
             self.assertIn("Summary: WARN", rendered)
+            self.assertIn("Policy audit: WARN", rendered)
+            self.assertIn("- maps.allow_execute is true; real external execution is enabled.", rendered)
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
@@ -952,6 +968,26 @@ class CliTests(unittest.TestCase):
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_includes_policy_audit_ok_for_safe_profile(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["policy_audit"]["level"], "OK")
+        self.assertEqual(data["policy_audit"]["warnings"], [])
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
     def test_doctor_json_shows_warn_when_map_execution_enabled(self, mocked_find_spec) -> None:
         mocked_find_spec.return_value = object()
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -973,6 +1009,35 @@ class CliTests(unittest.TestCase):
         data = _json.loads(output.getvalue())
         self.assertEqual(data["config"]["map_execution"], "ENABLED")
         self.assertEqual(data["summary"], "WARN")
+        self.assertEqual(data["policy_audit"]["level"], "WARN")
+        self.assertEqual(
+            data["policy_audit"]["warnings"],
+            [{"key": "maps.allow_execute", "message": "real external execution is enabled"}],
+        )
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_policy_audit_invalid_updates_summary(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text("[safety]\nmax_snapshot_mb = 0\n", encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["policy_audit"]["level"], "INVALID")
+        self.assertEqual(data["policy_audit"]["warnings"], [])
+        self.assertEqual(data["policy_audit"]["errors"], [{"key": "safety.max_snapshot_mb", "message": "must be a positive integer"}])
+        self.assertEqual(data["summary"], "FAIL")
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
