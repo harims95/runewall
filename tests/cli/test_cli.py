@@ -17,6 +17,7 @@ from runewall.cli.main import EMPTY_LOG_MESSAGE, main
 from runewall.core.config import config_path
 from runewall.core.log import ActionLog
 from runewall.core.models import Action
+from runewall.core.snapshot import SnapshotEngine
 from runewall.maps import SiteMapRegistry
 
 
@@ -1166,6 +1167,160 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(exit_code, 1)
             self.assertEqual(output.getvalue().strip(), f"Action {action.id} is not approved.")
+
+    def test_approve_json_success_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                action = log.add_action(Action(action_type="file.delete", target="old.txt", status="pending"))
+                with redirect_stdout(output):
+                    exit_code = main(["approve", action.id, "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_id"], action.id)
+        self.assertEqual(data["status"], "approved")
+
+    def test_reject_json_success_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                action = log.add_action(Action(action_type="file.delete", target="old.txt", status="pending"))
+                with redirect_stdout(output):
+                    exit_code = main(["reject", action.id, "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_id"], action.id)
+        self.assertEqual(data["status"], "rejected")
+
+    def test_execute_json_success_for_approved_file_delete(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                target_file = Path(temp_dir) / "to_delete.txt"
+                target_file.write_text("content", encoding="utf-8")
+                log = ActionLog(root=Path.cwd())
+                action = log.add_action(Action(
+                    action_type="file.delete",
+                    target=str(target_file),
+                    status="approved",
+                ))
+                with redirect_stdout(output):
+                    exit_code = main(["execute", action.id, "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_id"], action.id)
+        self.assertEqual(data["status"], "success")
+
+    def test_rollback_json_success_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                root = Path(temp_dir)
+                target = root / "notes.txt"
+                target.write_text("before", encoding="utf-8")
+                log = ActionLog(root=root)
+                action = log.add_action(Action(action_type="file.write", target="notes.txt", status="approved"))
+                log.add_snapshot(SnapshotEngine(root=root).create_snapshot(action))
+                target.write_text("after", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["rollback", action.id, "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_id"], action.id)
+        self.assertEqual(data["status"], "rolled_back")
+
+    def test_rollback_last_json_success_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                root = Path(temp_dir)
+                target = root / "last.txt"
+                target.write_text("before", encoding="utf-8")
+                log = ActionLog(root=root)
+                action = log.add_action(Action(action_type="file.write", target="last.txt", status="approved"))
+                log.add_snapshot(SnapshotEngine(root=root).create_snapshot(action))
+                target.write_text("after", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["rollback", "--last", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_id"], action.id)
+        self.assertEqual(data["status"], "rolled_back")
+
+    def test_approve_json_missing_action_prints_json_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["approve", "missing-id", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["action_id"], "missing-id")
+        self.assertIn("not found", data["error"].lower())
+
+    def test_human_approval_output_unchanged_after_json_added(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                log = ActionLog(root=Path.cwd())
+                action = log.add_action(Action(action_type="file.delete", target="old.txt", status="pending"))
+                approve_output = io.StringIO()
+                with redirect_stdout(approve_output):
+                    exit_code_approve = main(["approve", action.id])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code_approve, 0)
+        self.assertIn(f"Approved action {action.id}.", approve_output.getvalue())
+        self.assertNotIn("{", approve_output.getvalue())
 
     @patch(
         "runewall.cli.main.read_url",

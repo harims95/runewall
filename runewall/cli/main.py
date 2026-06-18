@@ -67,13 +67,17 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser.add_argument("--json", action="store_true", dest="json_output")
     approve_parser = subcommands.add_parser("approve", help="Approve a pending action.")
     approve_parser.add_argument("action_id")
+    approve_parser.add_argument("--json", action="store_true", dest="json_output")
     reject_parser = subcommands.add_parser("reject", help="Reject a pending action.")
     reject_parser.add_argument("action_id")
+    reject_parser.add_argument("--json", action="store_true", dest="json_output")
     execute_parser = subcommands.add_parser("execute", help="Execute an approved action.")
     execute_parser.add_argument("action_id")
+    execute_parser.add_argument("--json", action="store_true", dest="json_output")
     rollback_parser = subcommands.add_parser("rollback", help="Rollback a recorded action.")
     rollback_parser.add_argument("action_id", nargs="?")
     rollback_parser.add_argument("--last", action="store_true")
+    rollback_parser.add_argument("--json", action="store_true", dest="json_output")
     cleanup_parser = subcommands.add_parser("cleanup", help="Clean up old Runewall data.")
     cleanup_subcommands = cleanup_parser.add_subparsers(dest="cleanup_command", required=True)
     cleanup_snapshots_parser = cleanup_subcommands.add_parser("snapshots", help="Delete snapshot directories older than retention period.")
@@ -619,49 +623,99 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "approve":
         log = ActionLog.open_existing(root=Path.cwd())
         if log is None:
+            if args.json_output:
+                print(json.dumps({"ok": False, "action_id": args.action_id, "error": NOT_INITIALIZED_MESSAGE}))
+                return 1
             print(NOT_INITIALIZED_MESSAGE)
             return 0
         action = log.get_action(args.action_id)
         if action is None:
+            if args.json_output:
+                print(json.dumps({"ok": False, "action_id": args.action_id, "error": f"Action not found: {args.action_id}"}))
+                return 1
             print(f"Action not found: {args.action_id}")
             return 1
         log.update_action_status(args.action_id, "approved")
+        if args.json_output:
+            print(json.dumps({"ok": True, "action_id": args.action_id, "status": "approved"}))
+            return 0
         print(f"Approved action {args.action_id}.")
         return 0
     if args.command == "reject":
         log = ActionLog.open_existing(root=Path.cwd())
         if log is None:
+            if args.json_output:
+                print(json.dumps({"ok": False, "action_id": args.action_id, "error": NOT_INITIALIZED_MESSAGE}))
+                return 1
             print(NOT_INITIALIZED_MESSAGE)
             return 0
         action = log.get_action(args.action_id)
         if action is None:
+            if args.json_output:
+                print(json.dumps({"ok": False, "action_id": args.action_id, "error": f"Action not found: {args.action_id}"}))
+                return 1
             print(f"Action not found: {args.action_id}")
             return 1
         log.update_action_status(args.action_id, "rejected")
+        if args.json_output:
+            print(json.dumps({"ok": True, "action_id": args.action_id, "status": "rejected"}))
+            return 0
         print(f"Rejected action {args.action_id}.")
         return 0
     if args.command == "execute":
         log = ActionLog.open_existing(root=Path.cwd())
         if log is None:
+            if args.json_output:
+                print(json.dumps({"ok": False, "action_id": args.action_id, "error": NOT_INITIALIZED_MESSAGE}))
+                return 1
             print(NOT_INITIALIZED_MESSAGE)
             return 0
         try:
             execute_approved_action(args.action_id, root=Path.cwd())
         except ExecutionError as error:
+            if args.json_output:
+                print(json.dumps({"ok": False, "action_id": args.action_id, "error": str(error)}))
+                return 1
             print(str(error))
             return 1
         except Exception as error:
+            if args.json_output:
+                print(json.dumps({"ok": False, "action_id": args.action_id, "error": f"Execution failed for action {args.action_id}: {error}"}))
+                return 1
             print(f"Execution failed for action {args.action_id}: {error}")
             return 1
+        if args.json_output:
+            print(json.dumps({"ok": True, "action_id": args.action_id, "status": "success"}))
+            return 0
         print(f"Executed action {args.action_id}.")
         return 0
     if args.command == "rollback":
         engine = RollbackEngine(root=Path.cwd())
         if args.last:
+            if args.json_output:
+                last_action = ActionLog(root=Path.cwd()).get_last_action()
+                if last_action is None:
+                    print(json.dumps({"ok": False, "action_id": None, "error": "No actions recorded yet."}))
+                    return 1
+                try:
+                    engine.rollback(last_action.id)
+                    print(json.dumps({"ok": True, "action_id": last_action.id, "status": "rolled_back"}))
+                    return 0
+                except Exception as error:
+                    print(json.dumps({"ok": False, "action_id": last_action.id, "error": str(error)}))
+                    return 1
             engine.rollback_last()
             print("Rolled back last action.")
             return 0
         if args.action_id:
+            if args.json_output:
+                try:
+                    engine.rollback(args.action_id)
+                    print(json.dumps({"ok": True, "action_id": args.action_id, "status": "rolled_back"}))
+                    return 0
+                except Exception as error:
+                    print(json.dumps({"ok": False, "action_id": args.action_id, "error": str(error)}))
+                    return 1
             engine.rollback(args.action_id)
             print(f"Rolled back action {args.action_id}.")
             return 0
