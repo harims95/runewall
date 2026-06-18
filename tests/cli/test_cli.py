@@ -4843,6 +4843,139 @@ class CliTests(unittest.TestCase):
         self.assertIn("Policy: block", rendered)
         self.assertIn("Decision: blocked", rendered)
 
+    def test_policy_audit_exists_as_cli_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "audit"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy audit: OK", output.getvalue())
+
+    def test_policy_audit_safe_profile_returns_ok(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "audit"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy audit: OK", rendered)
+        self.assertIn("No risky policy settings found.", rendered)
+
+    def test_policy_audit_maps_allow_execute_true_returns_warn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "maps.allow_execute", "true"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "audit"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        self.assertIn("maps.allow_execute is true; real external execution is enabled.", output.getvalue())
+
+    def test_policy_audit_rules_map_execute_auto_returns_warn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.map_execute", "auto"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "audit"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        self.assertIn("rules.map_execute is auto; map execution can proceed without review.", output.getvalue())
+
+    def test_policy_audit_rules_file_delete_auto_returns_warn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.file_delete", "auto"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "audit"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        self.assertIn("rules.file_delete is auto; file deletes can proceed without review.", output.getvalue())
+
+    def test_policy_audit_rules_unknown_auto_returns_warn(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "set", "rules.unknown", "auto"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "audit"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        self.assertIn("rules.unknown is auto; unknown actions can proceed without review.", output.getvalue())
+
+    def test_policy_audit_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["policy", "audit", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["level"], "OK")
+        self.assertEqual(data["warnings"], [])
+
+    def test_policy_audit_invalid_config_returns_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text("[safety]\nmax_snapshot_mb = 0\n", encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "audit", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["level"], "INVALID")
+        self.assertEqual(data["warnings"], [])
+        self.assertEqual(data["errors"], [{"key": "safety.max_snapshot_mb", "message": "must be a positive integer"}])
+
+    def test_policy_audit_does_not_modify_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_text = '[rules]\nfile_delete = "auto"\n'
+            config_file.write_text(config_text, encoding="utf-8")
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["policy", "audit"])
+                self.assertEqual(config_file.read_text(encoding="utf-8"), config_text)
+            finally:
+                os.chdir(original_cwd)
+
     def test_policy_explain_without_rules_still_explains_default_behavior(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

@@ -81,6 +81,12 @@ class PolicyExplanation:
         return _SOURCE_LABELS[self.source]
 
 
+@dataclass(frozen=True, slots=True)
+class PolicyAuditWarning:
+    key: str
+    message: str
+
+
 class RulesEngine:
     """Evaluate actions against explicit rules and safe defaults."""
 
@@ -201,3 +207,29 @@ def list_policies(config: RunewallConfig) -> dict[str, PolicyExplanation]:
 def decision_for_policy(policy: RulePolicy) -> str:
     """Map a policy to the effective decision label used by the CLI."""
     return _DECISION_MAP[policy]
+
+
+def audit_policy_config(config: RunewallConfig) -> list[PolicyAuditWarning]:
+    """Return warnings for risky policy-related config settings."""
+    warnings: list[PolicyAuditWarning] = []
+
+    if config.maps.allow_execute:
+        warnings.append(
+            PolicyAuditWarning(
+                key="maps.allow_execute",
+                message="real external execution is enabled",
+            )
+        )
+
+    risky_auto_rules = (
+        ("rules.map_execute", config.rules.map_execute, "map execution can proceed without review"),
+        ("rules.file_delete", config.rules.file_delete, "file deletes can proceed without review"),
+        ("rules.unknown", config.rules.unknown, "unknown actions can proceed without review"),
+        ("rules.file_write", config.rules.file_write, "file writes can proceed without review"),
+        ("rules.file_create", config.rules.file_create, "file creates can proceed without review"),
+    )
+    for key, value, message in risky_auto_rules:
+        if value == "auto":
+            warnings.append(PolicyAuditWarning(key=key, message=message))
+
+    return warnings

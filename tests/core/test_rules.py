@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.core.models import Action, Rule
-from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine, decision_for_policy, explain_policy, list_policies
+from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine, audit_policy_config, decision_for_policy, explain_policy, list_policies
 
 
 class RulesEngineTests(unittest.TestCase):
@@ -176,6 +176,24 @@ class RulesFromConfigTests(unittest.TestCase):
         self.assertEqual(decision_for_policy(SNAPSHOT), "snapshot_required")
         self.assertEqual(decision_for_policy(REVIEW), "review_required")
         self.assertEqual(decision_for_policy(BLOCK), "blocked")
+
+    def test_audit_policy_config_warns_for_risky_auto_rules_and_execute(self) -> None:
+        from runewall.core.config import MapsConfig, RulesConfig, RunewallConfig
+        warnings = audit_policy_config(
+            RunewallConfig(
+                maps=MapsConfig(allow_execute=True),
+                rules=RulesConfig(map_execute="auto", file_delete="auto", unknown="auto"),
+            )
+        )
+        self.assertEqual(
+            [(warning.key, warning.message) for warning in warnings],
+            [
+                ("maps.allow_execute", "real external execution is enabled"),
+                ("rules.map_execute", "map execution can proceed without review"),
+                ("rules.file_delete", "file deletes can proceed without review"),
+                ("rules.unknown", "unknown actions can proceed without review"),
+            ],
+        )
 
 
 if __name__ == "__main__":

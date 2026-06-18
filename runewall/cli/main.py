@@ -19,7 +19,7 @@ from runewall.maps.planner import DryRunPlanner, dry_run_result, missing_inputs_
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError
 from runewall.core.models import Action
 from runewall.core.rollback import RollbackEngine
-from runewall.core.rules import decision_for_policy, explain_policy, list_policies
+from runewall.core.rules import audit_policy_config, decision_for_policy, explain_policy, list_policies
 from runewall.core.snapshot import cleanup_snapshots
 from runewall.translate import read_url
 
@@ -91,6 +91,8 @@ def build_parser() -> argparse.ArgumentParser:
     policy_test_parser = policy_subcommands.add_parser("test", help="Show the effective policy decision for an action type.")
     policy_test_parser.add_argument("action_type")
     policy_test_parser.add_argument("--json", action="store_true", dest="json_output")
+    policy_audit_parser = policy_subcommands.add_parser("audit", help="Audit the current config for risky policy settings.")
+    policy_audit_parser.add_argument("--json", action="store_true", dest="json_output")
     version_parser = subcommands.add_parser("version", help="Print Runewall version.")
     version_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
@@ -220,6 +222,33 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Path: {path.resolve()}")
             return 0
     if args.command == "policy":
+        if args.policy_command == "audit":
+            raw_config = load_config_data(Path.cwd())
+            errors = validate_config_data(raw_config)
+            if errors:
+                if args.json_output:
+                    print(json.dumps({"ok": False, "level": "INVALID", "warnings": [], "errors": errors}))
+                    return 1
+                print("Policy audit: INVALID")
+                for error in errors:
+                    print(f"- {error['key']} {error['message']}")
+                return 1
+            warnings = audit_policy_config(load_config(Path.cwd()))
+            if args.json_output:
+                print(json.dumps({
+                    "ok": not warnings,
+                    "level": "OK" if not warnings else "WARN",
+                    "warnings": [{"key": warning.key, "message": warning.message} for warning in warnings],
+                }))
+                return 0 if not warnings else 1
+            if not warnings:
+                print("Policy audit: OK")
+                print("No risky policy settings found.")
+                return 0
+            print("Policy audit: WARN")
+            for warning in warnings:
+                print(f"- {warning.key} is true; {warning.message}." if warning.key == "maps.allow_execute" else f"- {warning.key} is auto; {warning.message}.")
+            return 1
         if args.policy_command == "explain":
             explanation = explain_policy(args.action_type, load_config(Path.cwd()))
             if args.json_output:
