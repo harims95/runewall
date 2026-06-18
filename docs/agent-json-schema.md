@@ -123,6 +123,23 @@ runewall act SITE FLOW --execute --json
 }
 ```
 
+### Success — Cloudflare list_zones
+
+```json
+{
+  "ok": true,
+  "executed": true,
+  "site": "cloudflare",
+  "flow": "list_zones",
+  "result": {
+    "zone_count": 2,
+    "zones": [
+      { "id": "zone_1", "name": "example.com", "status": "active", "type": "full" }
+    ]
+  }
+}
+```
+
 ### Success — Vercel list_projects
 
 ```json
@@ -250,9 +267,10 @@ Each real-execution map requires its own environment variable.
 
 | Site | Token variable |
 |---|---|
+| Cloudflare | `CLOUDFLARE_API_TOKEN` |
 | GitHub | `GITHUB_TOKEN` |
-| Vercel | `VERCEL_TOKEN` |
 | Netlify | `NETLIFY_TOKEN` |
 | Supabase | `SUPABASE_ACCESS_TOKEN` |
+| Vercel | `VERCEL_TOKEN` |
 
 Tokens are read only from environment variables. They are never echoed, stored in config, or written to the action log.

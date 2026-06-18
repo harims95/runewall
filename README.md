@@ -295,7 +295,7 @@ Currently bundled maps:
 
 | Site | Flow | Execution |
 |---|---|---|
-| Cloudflare | `list_zones` | dry-run only |
+| Cloudflare | `list_zones` | dry-run + real API |
 | Discord | `send_message` | dry-run only |
 | GitHub | `create_issue` | dry-run + real API |
 | Linear | `create_issue` | dry-run only |
@@ -304,7 +304,7 @@ Currently bundled maps:
 | Supabase | `list_projects` | dry-run + real API |
 | Vercel | `list_projects` | dry-run + real API |
 
-`GitHub`, `Netlify`, `Supabase`, and `Vercel` maps have real API execution. `Cloudflare`, `Discord`, `Linear`, and `Slack` are dry-run and planning only.
+`Cloudflare`, `GitHub`, `Netlify`, `Supabase`, and `Vercel` maps have real API execution. `Discord`, `Linear`, and `Slack` are dry-run and planning only.
 
 Real execution is disabled by default. To enable it:
 
@@ -456,7 +456,7 @@ The config is local-first. It is never uploaded or sent anywhere.
 
 ## Real map execution
 
-Four bundled maps support real API execution. All others are dry-run and planning only.
+Five bundled maps support real API execution. All others are dry-run and planning only.
 
 Real execution is disabled by default. Enable it:
 
@@ -471,6 +471,13 @@ runewall config set maps.allow_execute false
 ```
 
 Each map requires its own token in the environment. Tokens are read only from environment variables and are never printed, stored in config, or written to the action log. Dry-run never requires tokens and never calls external APIs.
+
+**Cloudflare list_zones** — requires `CLOUDFLARE_API_TOKEN`
+
+```bash
+set CLOUDFLARE_API_TOKEN=your_token_here
+runewall act cloudflare list_zones --execute
+```
 
 **GitHub create_issue** — requires `GITHUB_TOKEN`
 
