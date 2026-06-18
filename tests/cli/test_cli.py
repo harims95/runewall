@@ -1653,6 +1653,115 @@ class CliTests(unittest.TestCase):
             self.assertEqual(output.getvalue().strip(), "Read failed: network down")
 
 
+    @patch(
+        "runewall.cli.main.read_url",
+        return_value={
+            "url": "https://example.com",
+            "title": "Example Page",
+            "headings": ["Heading One", "Heading Two"],
+            "text": "Some text content.",
+        },
+    )
+    def test_read_json_success_prints_valid_json(self, mocked_read) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["read", "https://example.com", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["url"], "https://example.com")
+        self.assertEqual(data["title"], "Example Page")
+        self.assertEqual(data["headings"], ["Heading One", "Heading Two"])
+        self.assertEqual(data["text"], "Some text content.")
+        self.assertFalse(data["logged"])
+
+    @patch(
+        "runewall.cli.main.read_url",
+        return_value={
+            "url": "https://example.com",
+            "title": "Example Page",
+            "headings": [],
+            "text": "Some text.",
+        },
+    )
+    def test_read_json_with_init_includes_logged_true_and_logs_action(self, mocked_read) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["read", "https://example.com", "--json"])
+                action = ActionLog.open_existing(root=Path.cwd()).get_last_action()
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["logged"])
+        self.assertIsNotNone(action)
+        assert action is not None
+        self.assertEqual(action.action_type, "web.read")
+        self.assertEqual(action.status, "success")
+
+    @patch("runewall.cli.main.read_url", side_effect=RuntimeError("network down"))
+    def test_read_json_failure_prints_valid_json_and_exits_nonzero(self, mocked_read) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["read", "https://example.com", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["url"], "https://example.com")
+        self.assertIn("network down", data["error"])
+
+    @patch(
+        "runewall.cli.main.read_url",
+        return_value={
+            "url": "https://example.com",
+            "title": "Example Page",
+            "headings": ["Heading"],
+            "text": "Text content.",
+        },
+    )
+    def test_read_human_output_unchanged_after_json_added(self, mocked_read) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["read", "https://example.com"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Title: Example Page", rendered)
+        self.assertIn("- Heading", rendered)
+        self.assertIn("Text preview:", rendered)
+        self.assertNotIn("{", rendered)
+
     def test_cleanup_snapshots_with_no_snapshots_dir_exits_cleanly(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

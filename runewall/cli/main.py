@@ -63,6 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     pending_parser.add_argument("--json", action="store_true", dest="json_output")
     read_parser = subcommands.add_parser("read", help="Read a URL without a browser.")
     read_parser.add_argument("url")
+    read_parser.add_argument("--json", action="store_true", dest="json_output")
     status_parser = subcommands.add_parser("status", help="Show current Runewall status.")
     status_parser.add_argument("--json", action="store_true", dest="json_output")
     approve_parser = subcommands.add_parser("approve", help="Approve a pending action.")
@@ -534,6 +535,9 @@ def main(argv: list[str] | None = None) -> int:
                         reversible=False,
                     )
                 )
+            if args.json_output:
+                print(json.dumps({"ok": False, "url": args.url, "error": str(error)}))
+                return 1
             print(f"Read failed: {error}")
             return 1
 
@@ -552,6 +556,17 @@ def main(argv: list[str] | None = None) -> int:
                     reversible=False,
                 )
             )
+
+        if args.json_output:
+            print(json.dumps({
+                "ok": True,
+                "url": content.get("url", args.url),
+                "title": content["title"],
+                "headings": content["headings"],
+                "text": content["text"],
+                "logged": log is not None,
+            }))
+            return 0
 
         preview = content["text"][:200].strip()
         print(f"Title: {content['title']}")
