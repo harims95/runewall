@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import sys
 
-from runewall.core.config import config_path, ensure_config, format_config_data, load_config, load_config_data, safe_config_dict, set_config_value
+from runewall.core.config import config_path, ensure_config, format_config_data, load_config, load_config_data, RESET_CONFIG_TEXT, safe_config_dict, set_config_value, validate_config_data
 from runewall.core.db import database_path, initialize_database, project_state_dir
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
@@ -73,6 +73,10 @@ def build_parser() -> argparse.ArgumentParser:
     config_set_parser.add_argument("key")
     config_set_parser.add_argument("value")
     config_set_parser.add_argument("--json", action="store_true", dest="json_output")
+    config_validate_parser = config_subcommands.add_parser("validate", help="Validate local config.")
+    config_validate_parser.add_argument("--json", action="store_true", dest="json_output")
+    config_reset_parser = config_subcommands.add_parser("reset", help="Reset config to safe defaults.")
+    config_reset_parser.add_argument("--json", action="store_true", dest="json_output")
     version_parser = subcommands.add_parser("version", help="Print Runewall version.")
     version_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
@@ -160,6 +164,28 @@ def main(argv: list[str] | None = None) -> int:
                 }))
                 return 0
             print(f"Updated config: {args.key} = {args.value}")
+            return 0
+        if args.config_command == "validate":
+            raw = load_config_data(Path.cwd())
+            errors = validate_config_data(raw)
+            if args.json_output:
+                print(json.dumps({"ok": not errors, "errors": errors}))
+                return 0 if not errors else 1
+            if not errors:
+                print("Config: OK")
+            else:
+                print("Config: INVALID")
+                for err in errors:
+                    print(f"  - {err['key']}: {err['message']}")
+            return 0 if not errors else 1
+        if args.config_command == "reset":
+            path = config_path(Path.cwd())
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(RESET_CONFIG_TEXT, encoding="utf-8")
+            if args.json_output:
+                print(json.dumps({"ok": True, "path": str(path.resolve()), "reset": True}))
+                return 0
+            print(f"Config reset to defaults: {path}")
             return 0
     if args.command == "log":
         log = ActionLog(root=Path.cwd())

@@ -2138,6 +2138,155 @@ class CliTests(unittest.TestCase):
             self.assertEqual(action.result, {"title": "Example Page", "heading_count": 1, "text_length": 26})
             self.assertNotIn("Runewall is not initialized; read action was not logged.", output.getvalue())
 
+    def test_config_validate_default_config_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("OK", output.getvalue())
+
+    def test_config_validate_json_default_config_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["errors"], [])
+
+    def test_config_validate_invalid_max_snapshot_mb_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[safety]\nmax_snapshot_mb = -1\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any(e["key"] == "safety.max_snapshot_mb" for e in data["errors"]))
+
+    def test_config_validate_invalid_snapshot_days_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text("[retention]\nsnapshot_days = 0\n", encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any(e["key"] == "retention.snapshot_days" for e in data["errors"]))
+
+    def test_config_validate_invalid_allow_execute_type_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text('[maps]\nallow_execute = "yes"\n', encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["config", "validate", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any(e["key"] == "maps.allow_execute" for e in data["errors"]))
+
+    def test_config_reset_writes_default_safe_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "reset"])
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            finally:
+                os.chdir(original_cwd)
+            self.assertTrue(config_file.exists())
+            content = config_file.read_text(encoding="utf-8")
+            self.assertIn("allow_execute = false", content)
+            self.assertIn("GITHUB_TOKEN", content)
+            self.assertIn("CLOUDFLARE_API_TOKEN", content)
+
+    def test_config_reset_keeps_allow_execute_false(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "maps.allow_execute", "true"])
+                main(["config", "reset"])
+            finally:
+                os.chdir(original_cwd)
+            from runewall.core.config import load_config
+            self.assertFalse(load_config(Path(temp_dir)).maps.allow_execute)
+
+    def test_config_reset_json_returns_ok_true(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "reset", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["reset"])
+        self.assertIn("path", data)
+
+    def test_config_reset_does_not_delete_db(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "reset"])
+                db_path = Path(temp_dir) / ".runewall" / "runewall.db"
+            finally:
+                os.chdir(original_cwd)
+            self.assertTrue(db_path.exists())
+
     def test_config_set_maps_allow_execute_true(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()

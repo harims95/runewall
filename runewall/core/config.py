@@ -55,6 +55,61 @@ class RunewallConfig:
         return asdict(self)
 
 
+RESET_CONFIG_TEXT = """[safety]
+default_policy = "review"
+max_snapshot_mb = 500
+
+[retention]
+snapshot_days = 30
+
+[maps]
+allow_execute = false
+
+[auth]
+github_token_env = "GITHUB_TOKEN"
+vercel_token_env = "VERCEL_TOKEN"
+netlify_token_env = "NETLIFY_TOKEN"
+supabase_access_token_env = "SUPABASE_ACCESS_TOKEN"
+cloudflare_api_token_env = "CLOUDFLARE_API_TOKEN"
+"""
+
+_VALID_DEFAULT_POLICIES = {"auto", "review", "snapshot"}
+
+
+def validate_config_data(data: dict[str, Any]) -> list[dict[str, str]]:
+    errors: list[dict[str, str]] = []
+
+    safety = data.get("safety", {})
+    if isinstance(safety, dict):
+        dp = safety.get("default_policy")
+        if dp is not None and dp not in _VALID_DEFAULT_POLICIES:
+            errors.append({"key": "safety.default_policy", "message": f"must be one of: auto, review, snapshot (got {dp!r})"})
+        msm = safety.get("max_snapshot_mb")
+        if msm is not None and (not isinstance(msm, int) or isinstance(msm, bool) or msm <= 0):
+            errors.append({"key": "safety.max_snapshot_mb", "message": "must be a positive integer"})
+
+    retention = data.get("retention", {})
+    if isinstance(retention, dict):
+        sd = retention.get("snapshot_days")
+        if sd is not None and (not isinstance(sd, int) or isinstance(sd, bool) or sd <= 0):
+            errors.append({"key": "retention.snapshot_days", "message": "must be a positive integer"})
+
+    maps_section = data.get("maps", {})
+    if isinstance(maps_section, dict):
+        ae = maps_section.get("allow_execute")
+        if ae is not None and not isinstance(ae, bool):
+            errors.append({"key": "maps.allow_execute", "message": "must be a boolean"})
+
+    auth = data.get("auth", {})
+    if isinstance(auth, dict):
+        for env_key in ("github_token_env", "vercel_token_env", "netlify_token_env", "supabase_access_token_env", "cloudflare_api_token_env"):
+            val = auth.get(env_key)
+            if val is not None and not isinstance(val, str):
+                errors.append({"key": f"auth.{env_key}", "message": "must be a string"})
+
+    return errors
+
+
 KNOWN_CONFIG_KEYS: dict[str, type] = {
     "safety.default_policy": str,
     "safety.max_snapshot_mb": int,
