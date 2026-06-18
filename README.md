@@ -302,11 +302,23 @@ Currently bundled maps:
 | Netlify | `list_sites` | dry-run only |
 | Slack | `send_message` | dry-run only |
 | Supabase | `list_projects` | dry-run only |
-| Vercel | `list_projects` | dry-run only |
+| Vercel | `list_projects` | dry-run + real API |
 
-Only `GitHub create_issue` has real API execution. All other maps are dry-run and planning only.
+`GitHub create_issue` and `Vercel list_projects` have real API execution. All other maps are dry-run and planning only.
 
-Real execution is disabled by default. To enable it, set `maps.allow_execute = true` in config and provide the required token in the environment. Tokens and secrets are never stored in map files.
+Real execution is disabled by default. To enable it:
+
+```bash
+runewall config set maps.allow_execute true
+```
+
+To disable again:
+
+```bash
+runewall config set maps.allow_execute false
+```
+
+Dry-run does not require tokens and never calls external APIs. Tokens are read only from environment variables and are never printed, stored, or logged.
 
 List bundled maps with:
 
@@ -442,33 +454,39 @@ The config is local-first. It is never uploaded or sent anywhere.
 
 `GITHUB_TOKEN` is always read from the environment only. It is never printed, stored in the config file, or written to the action log.
 
-## GitHub create issue execution
+## Real map execution
 
-Runewall can execute one real mapped action right now: `github create_issue`.
+Two bundled maps support real API execution:
 
-It uses the GitHub REST API, not browser automation.
+**GitHub create_issue** — uses the GitHub REST API.
 
-It requires `GITHUB_TOKEN` from the environment, and it does not store or log the token.
-
-It also requires `allow_execute = true` in `.runewall/config.toml`. See [Local config](#local-config).
-
-If Runewall is initialized, execution is logged as `map.execute`.
-
-If execution succeeds, the result includes issue number and issue URL when GitHub returns them.
-
-If `GITHUB_TOKEN` is missing, execution fails safely and logs `failed` if Runewall is initialized.
-
-Usage:
+Requires `GITHUB_TOKEN` in the environment.
 
 ```bash
 set GITHUB_TOKEN=your_token_here
 
-runewall act github create_issue --execute --input repo=user/repo --input title="Bug report" --input body="Details"
+runewall act github create_issue --execute --input repo=user/repo --input title="Bug" --input body="Details"
 ```
 
-Tests use mocks.
+**Vercel list_projects** — uses the Vercel REST API.
 
-Do not use a real token unless you intentionally want to create a real GitHub issue.
+Requires `VERCEL_TOKEN` in the environment.
+
+```bash
+set VERCEL_TOKEN=your_token_here
+
+runewall act vercel list_projects --execute
+```
+
+Both require `allow_execute = true` in `.runewall/config.toml`. See [Local config](#local-config).
+
+If Runewall is initialized, execution is logged as `map.execute`.
+
+If a token is missing, execution fails with a clear error and nothing is sent to the external service.
+
+Tokens are read only from environment variables. They are never printed, stored in config, or written to the action log.
+
+Tests use mocks. Do not use real tokens unless you intentionally want to call the external API.
 
 ## Doctor
 
@@ -479,7 +497,7 @@ It checks:
 - Python version
 - whether `.runewall/runewall.db` exists
 - whether required dependencies like `httpx` and `bs4` are installed
-- whether `GITHUB_TOKEN` is set without printing the token value
+- whether `GITHUB_TOKEN` and `VERCEL_TOKEN` are set without printing their values
 - bundled maps count
 - a final `OK`, `WARN`, or `FAIL` summary
 
