@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0.0",
+  "site": {
+    "name": "Discord",
+    "base_url": "https://discord.com",
+    "map_version": "0.1.0"
+  },
+  "flows": {
+    "send_message": {
+      "description": "Send a Discord channel message",
+      "risk_level": "medium",
+      "reversible": false,
+      "requires_auth": true,
+      "inputs": {
+        "channel_id": {
+          "type": "string",
+          "required": true
+        },
+        "content": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "api_path": {
+        "method": "POST",
+        "url": "/api/v10/channels/{channel_id}/messages"
+      }
+    }
+  }
+}

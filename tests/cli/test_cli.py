@@ -569,6 +569,100 @@ class CliTests(unittest.TestCase):
         self.assertIn("Missing inputs: text", rendered)
         self.assertIn("Missing required inputs: text", rendered)
 
+    def test_maps_list_includes_discord(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "list"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Discord", rendered)
+        self.assertIn("https://discord.com", rendered)
+
+    def test_maps_show_discord_prints_send_message(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "show", "discord"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Discord", rendered)
+        self.assertIn("Base URL: https://discord.com", rendered)
+        self.assertIn("Map version: 0.1.0", rendered)
+        self.assertIn("Schema version: 1.0.0", rendered)
+        self.assertIn("- send_message", rendered)
+        self.assertIn("risk_level: medium", rendered)
+        self.assertIn("reversible: False", rendered)
+        self.assertIn("requires_auth: True", rendered)
+        self.assertIn("required inputs: channel_id, content", rendered)
+
+    def test_maps_validate_includes_discord_ok(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "validate"])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("discord (Discord)\tOK", rendered)
+
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_dry_run_for_discord_send_message(self, mocked_execute) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "discord", "send_message", "--dry-run",
+                        "--input", "channel_id=123",
+                        "--input", "content=Hello",
+                    ])
+            finally:
+                os.chdir(original_cwd)
+
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Site name: Discord", rendered)
+        self.assertIn("Flow name: send_message", rendered)
+        self.assertIn("Risk level: medium", rendered)
+        self.assertIn("Reversible: False", rendered)
+        self.assertIn("Requires auth: True", rendered)
+        self.assertIn("- channel_id=123", rendered)
+        self.assertIn("- content=Hello", rendered)
+        self.assertIn("Missing inputs: none", rendered)
+        self.assertIn("API path: POST /api/v10/channels/{channel_id}/messages", rendered)
+        mocked_execute.assert_not_called()
+
+    def test_act_dry_run_json_for_discord_send_message(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "discord", "send_message", "--dry-run", "--json",
+                "--input", "channel_id=123",
+                "--input", "content=Hello",
+            ])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "discord")
+        self.assertEqual(data["flow"], "send_message")
+        self.assertEqual(data["risk_level"], "medium")
+        self.assertFalse(data["reversible"])
+        self.assertEqual(data["missing_inputs"], [])
+        self.assertEqual(data["api_path"], {"method": "POST", "url": "/api/v10/channels/{channel_id}/messages"})
+
+    def test_act_dry_run_discord_missing_content_fails_clearly(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main([
+                "act", "discord", "send_message", "--dry-run",
+                "--input", "channel_id=123",
+            ])
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Missing inputs: content", rendered)
+        self.assertIn("Missing required inputs: content", rendered)
+
     def test_maps_show_unknown_site_fails_clearly(self) -> None:
         output = io.StringIO()
 
