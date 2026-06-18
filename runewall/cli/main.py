@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import importlib.util
 import json
 import os
@@ -59,6 +60,8 @@ def build_parser() -> argparse.ArgumentParser:
     config_set_parser.add_argument("key")
     config_set_parser.add_argument("value")
     config_set_parser.add_argument("--json", action="store_true", dest="json_output")
+    version_parser = subcommands.add_parser("version", help="Print Runewall version.")
+    version_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser("doctor", help="Check local Runewall health.")
     doctor_parser.add_argument("--json", action="store_true", dest="json_output")
     pending_parser = subcommands.add_parser("pending", help="Show pending actions.")
@@ -452,6 +455,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  requires_auth: {flow_data.get('requires_auth', False)}")
                 print(f"  required inputs: {', '.join(required_inputs) if required_inputs else 'none'}")
             return 0
+    if args.command == "version":
+        ver = importlib.metadata.version("runewall")
+        if args.json_output:
+            print(json.dumps({"name": "runewall", "version": ver}))
+            return 0
+        print(f"Runewall {ver}")
+        return 0
     if args.command == "doctor":
         db_exists = database_path(Path.cwd()).exists()
         httpx_available = importlib.util.find_spec("httpx") is not None

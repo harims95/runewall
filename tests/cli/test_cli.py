@@ -22,6 +22,38 @@ from runewall.maps import SiteMapRegistry
 
 
 class CliTests(unittest.TestCase):
+    def test_version_prints_human_readable_output(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["version"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue().strip()
+        self.assertTrue(rendered.startswith("Runewall "))
+        self.assertNotIn("{", rendered)
+
+    def test_version_json_prints_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["version", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["name"], "runewall")
+        self.assertIn("version", data)
+        self.assertIsInstance(data["version"], str)
+        self.assertTrue(len(data["version"]) > 0)
+
+    def test_version_json_matches_human_version(self) -> None:
+        human_output = io.StringIO()
+        json_output = io.StringIO()
+        with redirect_stdout(human_output):
+            main(["version"])
+        with redirect_stdout(json_output):
+            main(["version", "--json"])
+        import json as _json
+        data = _json.loads(json_output.getvalue())
+        self.assertIn(data["version"], human_output.getvalue())
+
     def test_init_command(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
