@@ -114,6 +114,16 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertEqual(site_map.schema_version, "1.0.0")
         self.assertIn("create_issue", site_map.flows)
 
+    def test_registry_loads_supabase_json(self) -> None:
+        registry = SiteMapRegistry()
+
+        site_map = registry.load_map("supabase.json")
+
+        self.assertEqual(site_map.site_name, "Supabase")
+        self.assertEqual(site_map.base_url, "https://supabase.com")
+        self.assertEqual(site_map.schema_version, "1.0.0")
+        self.assertIn("list_projects", site_map.flows)
+
     def test_validate_bundled_maps_passes_with_github_vercel_netlify_cloudflare_and_linear(self) -> None:
         registry = SiteMapRegistry()
 
@@ -121,12 +131,8 @@ class SiteMapRegistryTests(unittest.TestCase):
 
         by_key = {result.site_key: result for result in results}
 
-        self.assertIn("github", by_key)
-        self.assertIn("vercel", by_key)
-        self.assertIn("netlify", by_key)
-        self.assertIn("cloudflare", by_key)
-        self.assertIn("linear", by_key)
-        for key in ("github", "vercel", "netlify", "cloudflare", "linear"):
+        for key in ("github", "vercel", "netlify", "cloudflare", "linear", "supabase"):
+            self.assertIn(key, by_key)
             self.assertTrue(by_key[key].ok)
             self.assertIsNone(by_key[key].error)
 
