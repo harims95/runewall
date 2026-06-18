@@ -22,6 +22,14 @@ class MapExecutorTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def _write_config_with_token_env(self, root: Path, token_key: str, token_env_name: str) -> None:
+        config_dir = root / ".runewall"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        (config_dir / "config.toml").write_text(
+            f"[maps]\nallow_execute = true\n\n[auth]\n{token_key} = \"{token_env_name}\"\n",
+            encoding="utf-8",
+        )
+
     def test_execute_is_blocked_when_config_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(MapExecutionError) as context:
@@ -412,6 +420,97 @@ class MapExecutorTests(unittest.TestCase):
             with self.assertRaises(MapExecutionError) as context:
                 execute_map_action("vercel", "list_projects", {}, root=root)
         self.assertEqual(context.exception.error_code, "API_ERROR")
+
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_custom_vercel_token_env_missing_returns_custom_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_config_with_token_env(root, "vercel_token_env", "MY_VERCEL_TOKEN")
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("vercel", "list_projects", {}, root=root)
+        self.assertEqual(str(context.exception), "MY_VERCEL_TOKEN is required to execute vercel:list_projects.")
+        self.assertEqual(context.exception.error_code, "MISSING_TOKEN")
+
+    @patch.dict("os.environ", {"MY_VERCEL_TOKEN": "secret-custom-tok"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_custom_vercel_token_env_present_is_used_in_execution(self, mocked_get) -> None:
+        class Response:
+            status_code = 200
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {"projects": [{"id": "p1", "name": "app", "framework": "nextjs"}]}
+
+        mocked_get.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_config_with_token_env(root, "vercel_token_env", "MY_VERCEL_TOKEN")
+            result = execute_map_action("vercel", "list_projects", {}, root=root)
+
+        self.assertEqual(result["project_count"], 1)
+        self.assertNotIn("secret-custom-tok", str(result))
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_custom_netlify_token_env_missing_returns_custom_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_config_with_token_env(root, "netlify_token_env", "MY_NETLIFY_TOKEN")
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("netlify", "list_sites", {}, root=root)
+        self.assertEqual(str(context.exception), "MY_NETLIFY_TOKEN is required to execute netlify:list_sites.")
+        self.assertEqual(context.exception.error_code, "MISSING_TOKEN")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_custom_supabase_access_token_env_missing_returns_custom_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_config_with_token_env(root, "supabase_access_token_env", "MY_SUPABASE_TOKEN")
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("supabase", "list_projects", {}, root=root)
+        self.assertEqual(str(context.exception), "MY_SUPABASE_TOKEN is required to execute supabase:list_projects.")
+        self.assertEqual(context.exception.error_code, "MISSING_TOKEN")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_custom_cloudflare_api_token_env_missing_returns_custom_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_config_with_token_env(root, "cloudflare_api_token_env", "MY_CF_TOKEN")
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("cloudflare", "list_zones", {}, root=root)
+        self.assertEqual(str(context.exception), "MY_CF_TOKEN is required to execute cloudflare:list_zones.")
+        self.assertEqual(context.exception.error_code, "MISSING_TOKEN")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_custom_github_token_env_missing_returns_custom_name(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_config_with_token_env(root, "github_token_env", "MY_GH_TOKEN")
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("github", "create_issue", {"repo": "u/r", "title": "t"}, root=root)
+        self.assertEqual(str(context.exception), "MY_GH_TOKEN is required to execute github:create_issue.")
+        self.assertEqual(context.exception.error_code, "MISSING_TOKEN")
+
+    @patch.dict("os.environ", {"MY_GH_TOKEN": "secret-custom-gh"}, clear=True)
+    @patch("runewall.maps.executor._httpx_post")
+    def test_custom_github_token_env_present_is_used_in_execution(self, mocked_post) -> None:
+        class Response:
+            status_code = 201
+
+            @staticmethod
+            def json() -> dict[str, object]:
+                return {"html_url": "https://github.com/u/r/issues/1", "number": 1}
+
+        mocked_post.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_config_with_token_env(root, "github_token_env", "MY_GH_TOKEN")
+            result = execute_map_action("github", "create_issue", {"repo": "u/r", "title": "t"}, root=root)
+
+        self.assertEqual(result["issue_number"], 1)
+        self.assertNotIn("secret-custom-gh", str(result))
 
 
 if __name__ == "__main__":

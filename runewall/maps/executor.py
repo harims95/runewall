@@ -25,16 +25,18 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
     normalized_flow = flow.strip()
     if not _is_supported_execution(normalized_site, normalized_flow):
         raise UnsupportedExecutionError(f"Execution is not supported for {site}:{flow}.")
-    if not load_config(root).maps.allow_execute:
+    cfg = load_config(root)
+    if not cfg.maps.allow_execute:
         raise MapExecutionError(
             "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
             error_code="EXECUTION_DISABLED",
         )
 
     if normalized_site == "cloudflare" and normalized_flow == "list_zones":
-        token = os.environ.get("CLOUDFLARE_API_TOKEN")
+        env_name = cfg.auth.cloudflare_api_token_env
+        token = os.environ.get(env_name)
         if not token:
-            raise MapExecutionError("CLOUDFLARE_API_TOKEN is required to execute cloudflare:list_zones.", error_code="MISSING_TOKEN")
+            raise MapExecutionError(f"{env_name} is required to execute cloudflare:list_zones.", error_code="MISSING_TOKEN")
         response = _httpx_get(
             "https://api.cloudflare.com/client/v4/zones",
             headers={"Authorization": f"Bearer {token}"},
@@ -53,9 +55,10 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         return {"zone_count": len(zones), "zones": zones}
 
     if normalized_site == "supabase" and normalized_flow == "list_projects":
-        token = os.environ.get("SUPABASE_ACCESS_TOKEN")
+        env_name = cfg.auth.supabase_access_token_env
+        token = os.environ.get(env_name)
         if not token:
-            raise MapExecutionError("SUPABASE_ACCESS_TOKEN is required to execute supabase:list_projects.", error_code="MISSING_TOKEN")
+            raise MapExecutionError(f"{env_name} is required to execute supabase:list_projects.", error_code="MISSING_TOKEN")
         response = _httpx_get(
             "https://api.supabase.com/v1/projects",
             headers={"Authorization": f"Bearer {token}"},
@@ -74,9 +77,10 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         return {"project_count": len(projects), "projects": projects}
 
     if normalized_site == "netlify" and normalized_flow == "list_sites":
-        token = os.environ.get("NETLIFY_TOKEN")
+        env_name = cfg.auth.netlify_token_env
+        token = os.environ.get(env_name)
         if not token:
-            raise MapExecutionError("NETLIFY_TOKEN is required to execute netlify:list_sites.", error_code="MISSING_TOKEN")
+            raise MapExecutionError(f"{env_name} is required to execute netlify:list_sites.", error_code="MISSING_TOKEN")
         response = _httpx_get(
             "https://api.netlify.com/api/v1/sites",
             headers={"Authorization": f"Bearer {token}"},
@@ -95,9 +99,10 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         return {"site_count": len(sites), "sites": sites}
 
     if normalized_site == "vercel" and normalized_flow == "list_projects":
-        token = os.environ.get("VERCEL_TOKEN")
+        env_name = cfg.auth.vercel_token_env
+        token = os.environ.get(env_name)
         if not token:
-            raise MapExecutionError("VERCEL_TOKEN is required to execute vercel:list_projects.", error_code="MISSING_TOKEN")
+            raise MapExecutionError(f"{env_name} is required to execute vercel:list_projects.", error_code="MISSING_TOKEN")
         response = _httpx_get(
             "https://api.vercel.com/v9/projects",
             headers={"Authorization": f"Bearer {token}"},
@@ -115,9 +120,10 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
         ]
         return {"project_count": len(projects), "projects": projects}
 
-    token = os.environ.get("GITHUB_TOKEN")
+    env_name = cfg.auth.github_token_env
+    token = os.environ.get(env_name)
     if not token:
-        raise MapExecutionError("GITHUB_TOKEN is required to execute github:create_issue.", error_code="MISSING_TOKEN")
+        raise MapExecutionError(f"{env_name} is required to execute github:create_issue.", error_code="MISSING_TOKEN")
 
     repo = inputs["repo"]
     response = _httpx_post(

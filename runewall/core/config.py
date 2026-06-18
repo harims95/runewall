@@ -42,6 +42,10 @@ class MapsConfig:
 @dataclass(frozen=True)
 class AuthConfig:
     github_token_env: str = "GITHUB_TOKEN"
+    vercel_token_env: str = "VERCEL_TOKEN"
+    netlify_token_env: str = "NETLIFY_TOKEN"
+    supabase_access_token_env: str = "SUPABASE_ACCESS_TOKEN"
+    cloudflare_api_token_env: str = "CLOUDFLARE_API_TOKEN"
 
 
 @dataclass(frozen=True)
@@ -241,6 +245,10 @@ def _load_auth(data: Any) -> AuthConfig:
     section = data if isinstance(data, dict) else {}
     return AuthConfig(
         github_token_env=_as_str(section.get("github_token_env"), "GITHUB_TOKEN"),
+        vercel_token_env=_as_str(section.get("vercel_token_env"), "VERCEL_TOKEN"),
+        netlify_token_env=_as_str(section.get("netlify_token_env"), "NETLIFY_TOKEN"),
+        supabase_access_token_env=_as_str(section.get("supabase_access_token_env"), "SUPABASE_ACCESS_TOKEN"),
+        cloudflare_api_token_env=_as_str(section.get("cloudflare_api_token_env"), "CLOUDFLARE_API_TOKEN"),
     )
 
 
