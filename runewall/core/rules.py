@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from fnmatch import fnmatchcase
 
 from .config import RunewallConfig
@@ -35,6 +36,30 @@ _POLICY_MAP: dict[str, RulePolicy] = {
     "review": REVIEW,
     "block": BLOCK,
 }
+
+_ACTION_FIELD_MAP: dict[str, str] = {action_type: field_name for field_name, action_type in _ACTION_TYPE_MAP.items()}
+_SOURCE_LABELS: dict[str, str] = {
+    "config_rule": "config rule",
+    "default_rule": "default rule",
+    "default_policy_fallback": "default_policy fallback",
+    "unknown_fallback": "unknown fallback",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyExplanation:
+    action_type: str
+    policy: RulePolicy
+    source: str
+    reason: str
+
+    @property
+    def policy_name(self) -> str:
+        return self.policy.lower()
+
+    @property
+    def source_label(self) -> str:
+        return _SOURCE_LABELS[self.source]
 
 
 class RulesEngine:
@@ -90,4 +115,49 @@ def engine_from_config(config: RunewallConfig) -> RulesEngine:
     unknown_policy = _POLICY_MAP.get(config.rules.unknown) if config.rules.unknown is not None else None
     return RulesEngine(rules=rules, unknown_policy=unknown_policy)
 
+
+def explain_policy(action_type: str, config: RunewallConfig) -> PolicyExplanation:
+    """Explain which policy would apply to an action type under the current config."""
+    rule_field = _ACTION_FIELD_MAP.get(action_type)
+    if rule_field is not None:
+        configured_policy = getattr(config.rules, rule_field)
+        if configured_policy is not None:
+            return PolicyExplanation(
+                action_type=action_type,
+                policy=_POLICY_MAP[configured_policy],
+                source="config_rule",
+                reason=f'rules.{rule_field} = "{configured_policy}"',
+            )
+
+    default_policy = DEFAULT_POLICIES.get(action_type)
+    if default_policy is not None:
+        return PolicyExplanation(
+            action_type=action_type,
+            policy=default_policy,
+            source="default_rule",
+            reason=f'built-in default for "{action_type}"',
+        )
+
+    if config.rules.unknown is not None:
+        return PolicyExplanation(
+            action_type=action_type,
+            policy=_POLICY_MAP[config.rules.unknown],
+            source="config_rule",
+            reason=f'rules.unknown = "{config.rules.unknown}"',
+        )
+
+    if config.safety.default_policy == "review":
+        return PolicyExplanation(
+            action_type=action_type,
+            policy=REVIEW,
+            source="default_policy_fallback",
+            reason='safety.default_policy = "review"',
+        )
+
+    return PolicyExplanation(
+        action_type=action_type,
+        policy=REVIEW,
+        source="unknown_fallback",
+        reason='built-in unknown fallback = "review"',
+    )
 

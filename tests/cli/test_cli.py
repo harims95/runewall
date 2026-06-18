@@ -4395,6 +4395,145 @@ class CliTests(unittest.TestCase):
             self.assertEqual(cfg.rules.file_write, "review")
             self.assertFalse(cfg.maps.allow_execute)
 
+    def test_policy_explain_file_write_from_config_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text('[rules]\nfile_write = "snapshot"\n', encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Action: file.write", rendered)
+        self.assertIn("Policy: snapshot", rendered)
+        self.assertIn("Source: config rule", rendered)
+        self.assertIn('Reason: rules.file_write = "snapshot"', rendered)
+
+    def test_policy_explain_file_delete_from_config_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text('[rules]\nfile_delete = "block"\n', encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "file.delete"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: block", rendered)
+        self.assertIn("Source: config rule", rendered)
+        self.assertIn('Reason: rules.file_delete = "block"', rendered)
+
+    def test_policy_explain_web_read_from_config_rule(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text('[rules]\nweb_read = "auto"\n', encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "web.read"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: auto", rendered)
+        self.assertIn("Source: config rule", rendered)
+        self.assertIn('Reason: rules.web_read = "auto"', rendered)
+
+    def test_policy_explain_unknown_action_uses_rules_unknown(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text('[rules]\nunknown = "review"\n', encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "unknown.action", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_type"], "unknown.action")
+        self.assertEqual(data["policy"], "review")
+        self.assertEqual(data["source"], "config_rule")
+        self.assertEqual(data["reason"], 'rules.unknown = "review"')
+
+    def test_policy_explain_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["policy", "explain", "map.execute", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["action_type"], "map.execute")
+        self.assertEqual(data["policy"], "review")
+
+    def test_policy_explain_after_agent_profile_file_write_is_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "agent"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: review", output.getvalue())
+        self.assertIn("Source: config rule", output.getvalue())
+
+    def test_policy_explain_after_safe_profile_file_write_is_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: snapshot", output.getvalue())
+        self.assertIn("Source: config rule", output.getvalue())
+
+    def test_policy_explain_without_rules_still_explains_default_behavior(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text('[safety]\ndefault_policy = "review"\n', encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["policy", "explain", "file.write"])
+            finally:
+                os.chdir(original_cwd)
+        rendered = output.getvalue()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Policy: snapshot", rendered)
+        self.assertIn("Source: default rule", rendered)
+
     @patch("runewall.cli.main.importlib.util.find_spec")
     @patch.dict("os.environ", {}, clear=True)
     def test_doctor_custom_vercel_token_env_changes_human_label(self, mocked_find_spec) -> None:

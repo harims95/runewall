@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from runewall.core.models import Action, Rule
-from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine
+from runewall.core.rules import AUTO, BLOCK, REVIEW, SNAPSHOT, RulesEngine, explain_policy
 
 
 class RulesEngineTests(unittest.TestCase):
@@ -115,6 +115,31 @@ class RulesFromConfigTests(unittest.TestCase):
         from runewall.core.config import RunewallConfig
         from runewall.core.rules import rules_from_config
         self.assertEqual(rules_from_config(RunewallConfig()), [])
+
+    def test_explain_policy_uses_default_rule_without_rules_section(self) -> None:
+        from runewall.core.config import RunewallConfig
+        explanation = explain_policy("file.write", RunewallConfig())
+        self.assertEqual(explanation.policy, SNAPSHOT)
+        self.assertEqual(explanation.source, "default_rule")
+
+    def test_explain_policy_uses_unknown_rule_from_config(self) -> None:
+        from runewall.core.config import RulesConfig, RunewallConfig
+        explanation = explain_policy("calendar.invite", RunewallConfig(rules=RulesConfig(unknown="block")))
+        self.assertEqual(explanation.policy, BLOCK)
+        self.assertEqual(explanation.source, "config_rule")
+        self.assertEqual(explanation.reason, 'rules.unknown = "block"')
+
+    def test_explain_policy_uses_default_policy_fallback_when_review_matches_runtime_default(self) -> None:
+        from runewall.core.config import RunewallConfig, SafetyConfig
+        explanation = explain_policy("calendar.invite", RunewallConfig(safety=SafetyConfig(default_policy="review")))
+        self.assertEqual(explanation.policy, REVIEW)
+        self.assertEqual(explanation.source, "default_policy_fallback")
+
+    def test_explain_policy_uses_unknown_fallback_when_default_policy_differs(self) -> None:
+        from runewall.core.config import RunewallConfig, SafetyConfig
+        explanation = explain_policy("calendar.invite", RunewallConfig(safety=SafetyConfig(default_policy="snapshot")))
+        self.assertEqual(explanation.policy, REVIEW)
+        self.assertEqual(explanation.source, "unknown_fallback")
 
 
 if __name__ == "__main__":
