@@ -642,13 +642,14 @@ def main(argv: list[str] | None = None) -> int:
         github_token_set = bool(os.environ.get("GITHUB_TOKEN"))
         vercel_token_set = bool(os.environ.get("VERCEL_TOKEN"))
         netlify_token_set = bool(os.environ.get("NETLIFY_TOKEN"))
+        supabase_token_set = bool(os.environ.get("SUPABASE_ACCESS_TOKEN"))
         maps_count = len(SiteMapRegistry().list_maps())
         config_exists = config_path(Path.cwd()).exists()
         allow_execute = load_config(Path.cwd()).maps.allow_execute
 
         if not httpx_available or not bs4_available:
             summary = "FAIL"
-        elif not db_exists or not github_token_set or not vercel_token_set or not netlify_token_set or allow_execute:
+        elif not db_exists or not github_token_set or not vercel_token_set or not netlify_token_set or not supabase_token_set or allow_execute:
             summary = "WARN"
         else:
             summary = "OK"
@@ -667,6 +668,7 @@ def main(argv: list[str] | None = None) -> int:
                     "github_token": "present" if github_token_set else "missing",
                     "vercel_token": "present" if vercel_token_set else "missing",
                     "netlify_token": "present" if netlify_token_set else "missing",
+                    "supabase_access_token": "present" if supabase_token_set else "missing",
                 },
                 "maps": {"bundled_count": maps_count},
                 "summary": summary,
@@ -681,6 +683,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"GITHUB_TOKEN: {'set' if github_token_set else 'missing'}")
         print(f"VERCEL_TOKEN: {'set' if vercel_token_set else 'missing'}")
         print(f"NETLIFY_TOKEN: {'set' if netlify_token_set else 'missing'}")
+        print(f"SUPABASE_ACCESS_TOKEN: {'set' if supabase_token_set else 'missing'}")
         print(f"Bundled maps: {maps_count}")
         print(f"Map execution: {'ENABLED' if allow_execute else 'disabled'}")
         print(f"Summary: {summary}")

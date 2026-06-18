@@ -1109,6 +1109,83 @@ class CliTests(unittest.TestCase):
         data = _json.loads(output.getvalue())
         self.assertEqual(data["auth"]["netlify_token"], "present")
 
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_shows_supabase_token_missing(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertIn("SUPABASE_ACCESS_TOKEN: missing", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"SUPABASE_ACCESS_TOKEN": "secret-supabase-token"}, clear=True)
+    def test_doctor_shows_supabase_token_present(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["doctor"])
+        self.assertIn("SUPABASE_ACCESS_TOKEN: set", output.getvalue())
+        self.assertNotIn("secret-supabase-token", output.getvalue())
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_doctor_json_includes_supabase_access_token(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    main(["doctor", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("supabase_access_token", data["auth"])
+        self.assertEqual(data["auth"]["supabase_access_token"], "missing")
+
+    @patch("runewall.cli.main.importlib.util.find_spec")
+    @patch.dict("os.environ", {"SUPABASE_ACCESS_TOKEN": "secret-supabase-token"}, clear=True)
+    def test_doctor_json_does_not_print_supabase_token_value(self, mocked_find_spec) -> None:
+        mocked_find_spec.return_value = object()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["doctor", "--json"])
+        self.assertNotIn("secret-supabase-token", output.getvalue())
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["auth"]["supabase_access_token"], "present")
+
+    def test_maps_stats_json_includes_supabase_in_real_execution_maps(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("supabase", data["real_execution_maps"])
+
+    def test_maps_stats_json_does_not_include_supabase_in_dry_run_only(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats", "--json"])
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertNotIn("supabase", data["dry_run_only_maps"])
+
+    def test_maps_stats_human_includes_supabase_in_real_execution(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            main(["maps", "stats"])
+        self.assertIn("supabase", output.getvalue())
+
     def test_maps_stats_includes_netlify_in_real_execution(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
