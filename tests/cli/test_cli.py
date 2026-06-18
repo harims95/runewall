@@ -1178,6 +1178,148 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("Invalid integer for safety.max_snapshot_mb", output.getvalue())
 
+    def test_config_path_json_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "path", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("path", data)
+        self.assertIn("exists", data)
+
+    def test_config_path_json_exists_true_after_init(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "path", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["exists"])
+        self.assertIn(".runewall", data["path"])
+
+    def test_config_show_json_prints_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "show", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIn("config", data)
+        cfg = data["config"]
+        self.assertIn("safety", cfg)
+        self.assertIn("retention", cfg)
+        self.assertIn("maps", cfg)
+        self.assertIn("auth", cfg)
+
+    def test_config_show_json_safe_defaults_when_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "show", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["exists"])
+        self.assertIn("config", data)
+        self.assertFalse(data["config"]["maps"]["allow_execute"])
+        self.assertNotIn("super-secret", output.getvalue())
+
+    def test_config_show_json_reflects_allow_execute_true(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                main(["config", "set", "maps.allow_execute", "true"])
+                output.truncate(0)
+                output.seek(0)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "show", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["config"]["maps"]["allow_execute"])
+
+    def test_config_show_json_does_not_print_secrets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            config_file = Path(temp_dir) / ".runewall" / "config.toml"
+            config_file.parent.mkdir(parents=True, exist_ok=True)
+            config_file.write_text(
+                "[auth]\ngithub_token = \"super-secret-token\"\n",
+                encoding="utf-8",
+            )
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["config", "show", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 0)
+        self.assertNotIn("super-secret-token", output.getvalue())
+
+    def test_config_normal_human_output_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                main(["init"])
+                path_output = io.StringIO()
+                with redirect_stdout(path_output):
+                    exit_code_path = main(["config", "path"])
+                show_output = io.StringIO()
+                with redirect_stdout(show_output):
+                    exit_code_show = main(["config", "show"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code_path, 0)
+        self.assertIn(".runewall", path_output.getvalue())
+        self.assertNotIn("{", path_output.getvalue())
+        self.assertEqual(exit_code_show, 0)
+        self.assertIn("[safety]", show_output.getvalue())
+        self.assertIn("[maps]", show_output.getvalue())
+
     @patch("runewall.cli.main.read_url", side_effect=RuntimeError("network down"))
     def test_failed_read_logs_failed_if_db_exists(self, mocked_read) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

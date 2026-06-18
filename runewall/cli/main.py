@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import sys
 
-from runewall.core.config import config_path, ensure_config, format_config_data, load_config, load_config_data, set_config_value
+from runewall.core.config import config_path, ensure_config, format_config_data, load_config, load_config_data, safe_config_dict, set_config_value
 from runewall.core.db import database_path, initialize_database, project_state_dir
 from runewall.core.interceptor import ExecutionError, execute_approved_action
 from runewall.core.log import ActionLog
@@ -50,8 +50,10 @@ def build_parser() -> argparse.ArgumentParser:
     maps_show_parser.add_argument("--json", action="store_true", dest="json_output")
     config_parser = subcommands.add_parser("config", help="Inspect local Runewall config.")
     config_subcommands = config_parser.add_subparsers(dest="config_command", required=True)
-    config_subcommands.add_parser("path", help="Show the local config path.")
-    config_subcommands.add_parser("show", help="Show the local config.")
+    config_path_parser = config_subcommands.add_parser("path", help="Show the local config path.")
+    config_path_parser.add_argument("--json", action="store_true", dest="json_output")
+    config_show_parser = config_subcommands.add_parser("show", help="Show the local config.")
+    config_show_parser.add_argument("--json", action="store_true", dest="json_output")
     config_set_parser = config_subcommands.add_parser("set", help="Set a config value.")
     config_set_parser.add_argument("key")
     config_set_parser.add_argument("value")
@@ -88,9 +90,21 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "config":
         if args.config_command == "path":
-            print(str(config_path(Path.cwd()).resolve()))
+            path = config_path(Path.cwd()).resolve()
+            if args.json_output:
+                print(json.dumps({"path": str(path), "exists": path.exists()}))
+                return 0
+            print(str(path))
             return 0
         if args.config_command == "show":
+            if args.json_output:
+                exists = config_path(Path.cwd()).exists()
+                safe = safe_config_dict(load_config(Path.cwd()))
+                if exists:
+                    print(json.dumps({"config": safe}))
+                else:
+                    print(json.dumps({"exists": False, "config": safe}))
+                return 0
             print(format_config_data(load_config_data(Path.cwd())))
             return 0
         if args.config_command == "set":
