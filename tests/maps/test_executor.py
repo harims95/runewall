@@ -86,6 +86,74 @@ class MapExecutorTests(unittest.TestCase):
         self.assertEqual(kwargs["json"], {"title": "Bug report", "body": "Details"})
         self.assertNotIn("secret-token", str(kwargs["json"]))
 
+    def test_execute_netlify_list_sites_blocked_by_default_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("netlify", "list_sites", {}, root=Path(temp_dir))
+
+        self.assertEqual(
+            str(context.exception),
+            "Map execution is disabled by config. Set [maps] allow_execute = true to enable.",
+        )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_execute_netlify_list_sites_missing_token_fails_clearly(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+
+            with self.assertRaises(MapExecutionError) as context:
+                execute_map_action("netlify", "list_sites", {}, root=root)
+
+        self.assertEqual(
+            str(context.exception),
+            "NETLIFY_TOKEN is required to execute netlify:list_sites.",
+        )
+
+    @patch.dict("os.environ", {"NETLIFY_TOKEN": "secret-netlify-token"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_mocked_successful_netlify_response_returns_site_result(self, mocked_get) -> None:
+        class Response:
+            status_code = 200
+
+            @staticmethod
+            def json() -> list[dict[str, object]]:
+                return [
+                    {"id": "site_1", "name": "my-site", "url": "https://my-site.netlify.app", "admin_url": "https://app.netlify.com/sites/my-site"},
+                    {"id": "site_2", "name": "api-site", "url": "https://api-site.netlify.app", "admin_url": "https://app.netlify.com/sites/api-site"},
+                ]
+
+        mocked_get.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            result = execute_map_action("netlify", "list_sites", {}, root=root)
+
+        self.assertEqual(result["site_count"], 2)
+        self.assertEqual(len(result["sites"]), 2)
+        self.assertEqual(result["sites"][0]["name"], "my-site")
+        self.assertNotIn("secret-netlify-token", str(result))
+
+    @patch.dict("os.environ", {"NETLIFY_TOKEN": "secret-netlify-token"}, clear=True)
+    @patch("runewall.maps.executor._httpx_get")
+    def test_netlify_token_not_in_logged_result(self, mocked_get) -> None:
+        class Response:
+            status_code = 200
+
+            @staticmethod
+            def json() -> list[dict[str, object]]:
+                return []
+
+        mocked_get.return_value = Response()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self._write_allow_execute(root, True)
+            result = execute_map_action("netlify", "list_sites", {}, root=root)
+
+        self.assertNotIn("secret-netlify-token", str(result))
+
     def test_execute_vercel_list_projects_blocked_by_default_config(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             with self.assertRaises(MapExecutionError) as context:

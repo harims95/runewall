@@ -23,6 +23,27 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
             "Map execution is disabled by config. Set [maps] allow_execute = true to enable."
         )
 
+    if normalized_site == "netlify" and normalized_flow == "list_sites":
+        token = os.environ.get("NETLIFY_TOKEN")
+        if not token:
+            raise MapExecutionError("NETLIFY_TOKEN is required to execute netlify:list_sites.")
+        response = _httpx_get(
+            "https://api.netlify.com/api/v1/sites",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30.0,
+        )
+        if response.status_code >= 400:
+            detail = _error_detail(response)
+            raise MapExecutionError(f"Netlify list_sites failed: {response.status_code} {detail}")
+        payload = response.json()
+        sites_raw = payload if isinstance(payload, list) else []
+        sites = [
+            {k: v for k, v in s.items() if k in ("id", "name", "url", "admin_url")}
+            for s in sites_raw
+            if isinstance(s, dict)
+        ]
+        return {"site_count": len(sites), "sites": sites}
+
     if normalized_site == "vercel" and normalized_flow == "list_projects":
         token = os.environ.get("VERCEL_TOKEN")
         if not token:
@@ -76,7 +97,11 @@ def execute_map_action(site: str, flow: str, inputs: dict[str, str], root: Path 
 
 
 def _is_supported_execution(site: str, flow: str) -> bool:
-    return (site == "github" and flow == "create_issue") or (site == "vercel" and flow == "list_projects")
+    return (
+        (site == "github" and flow == "create_issue")
+        or (site == "vercel" and flow == "list_projects")
+        or (site == "netlify" and flow == "list_sites")
+    )
 
 
 def _httpx_post(*args: Any, **kwargs: Any) -> Any:
