@@ -3291,6 +3291,10 @@ class CliTests(unittest.TestCase):
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["error_code"], "EXECUTION_DISABLED")
+        self.assertEqual(data["policy"], "review")
+        self.assertEqual(data["decision"], "review_required")
+        self.assertEqual(data["policy_source"], "default_rule")
+        self.assertEqual(data["policy_reason"], 'built-in default for "map.execute"')
 
     @patch.dict("os.environ", {}, clear=True)
     def test_execute_json_error_code_missing_token(self) -> None:
@@ -3309,6 +3313,10 @@ class CliTests(unittest.TestCase):
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["error_code"], "MISSING_TOKEN")
+        self.assertEqual(data["policy"], "review")
+        self.assertEqual(data["decision"], "review_required")
+        self.assertEqual(data["policy_source"], "default_rule")
+        self.assertEqual(data["policy_reason"], 'built-in default for "map.execute"')
 
     def test_execute_json_error_code_unsupported_execution(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -3327,6 +3335,10 @@ class CliTests(unittest.TestCase):
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["error_code"], "UNSUPPORTED_EXECUTION")
+        self.assertEqual(data["policy"], "review")
+        self.assertEqual(data["decision"], "review_required")
+        self.assertEqual(data["policy_source"], "default_rule")
+        self.assertEqual(data["policy_reason"], 'built-in default for "map.execute"')
 
     @patch.dict("os.environ", {"VERCEL_TOKEN": "tok"}, clear=True)
     @patch("runewall.cli.main.execute_map_action")
@@ -3348,6 +3360,10 @@ class CliTests(unittest.TestCase):
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["error_code"], "API_ERROR")
+        self.assertEqual(data["policy"], "review")
+        self.assertEqual(data["decision"], "review_required")
+        self.assertEqual(data["policy_source"], "default_rule")
+        self.assertEqual(data["policy_reason"], 'built-in default for "map.execute"')
         self.assertNotIn("tok", output.getvalue())
 
     def test_execute_json_error_code_unknown_site(self) -> None:
@@ -3554,6 +3570,10 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertTrue(data["executed"])
         self.assertEqual(data["result"]["zone_count"], 2)
+        self.assertEqual(data["policy"], "review")
+        self.assertEqual(data["decision"], "review_required")
+        self.assertEqual(data["policy_source"], "default_rule")
+        self.assertEqual(data["policy_reason"], 'built-in default for "map.execute"')
         self.assertNotIn("secret-cf-token", output.getvalue())
 
     @patch.dict("os.environ", {"GITHUB_TOKEN": "secret-github-token"}, clear=True)
@@ -3582,7 +3602,55 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertTrue(data["executed"])
         self.assertIn("issue_url", data["result"])
+        self.assertEqual(data["policy"], "review")
+        self.assertEqual(data["decision"], "review_required")
+        self.assertEqual(data["policy_source"], "default_rule")
+        self.assertEqual(data["policy_reason"], 'built-in default for "map.execute"')
         self.assertNotIn("secret-github-token", output.getvalue())
+
+    @patch("runewall.cli.main.execute_map_action")
+    def test_act_execute_json_policy_block_prevents_external_call(self, mocked_execute) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text('[maps]\nallow_execute = true\n\n[rules]\nmap_execute = "block"\n', encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "vercel", "list_projects", "--execute", "--json"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        mocked_execute.assert_not_called()
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["error_code"], "POLICY_BLOCKED")
+        self.assertEqual(data["policy"], "block")
+        self.assertEqual(data["decision"], "blocked")
+        self.assertEqual(data["policy_source"], "config_rule")
+        self.assertEqual(data["policy_reason"], 'rules.map_execute = "block"')
+
+    def test_act_execute_human_policy_block_is_readable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                config_file = Path(temp_dir) / ".runewall" / "config.toml"
+                config_file.parent.mkdir(parents=True, exist_ok=True)
+                config_file.write_text('[maps]\nallow_execute = true\n\n[rules]\nmap_execute = "block"\n', encoding="utf-8")
+                with redirect_stdout(output):
+                    exit_code = main(["act", "vercel", "list_projects", "--execute"])
+            finally:
+                os.chdir(original_cwd)
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("Map execution blocked by policy: map.execute", output.getvalue())
 
     def test_act_execute_json_unsupported_map_prints_valid_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

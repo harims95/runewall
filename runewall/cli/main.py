@@ -434,6 +434,38 @@ def main(argv: list[str] | None = None) -> int:
                 print("Runewall is not initialized; dry run was not logged.")
             return 0
 
+        execute_policy_explanation = explain_policy("map.execute", load_config(Path.cwd()))
+        execute_policy_decision = decision_for_policy(execute_policy_explanation.policy)
+        if execute_policy_decision == "blocked":
+            error_message = "Execution blocked by policy for map.execute."
+            if log is not None:
+                log.add_action(
+                    Action(
+                        action_type="map.execute",
+                        target=f"{args.site}:{args.flow}",
+                        status="failed",
+                        params={"site": args.site, "flow": args.flow, "inputs": inputs},
+                        result={"error": error_message},
+                        reversible=False,
+                    )
+                )
+            if args.json_output:
+                print(json.dumps({
+                    "ok": False,
+                    "executed": False,
+                    "site": args.site,
+                    "flow": args.flow,
+                    "error": error_message,
+                    "error_code": "POLICY_BLOCKED",
+                    "policy": execute_policy_explanation.policy_name,
+                    "decision": execute_policy_decision,
+                    "policy_source": execute_policy_explanation.source,
+                    "policy_reason": execute_policy_explanation.reason,
+                }))
+                return 1
+            print("Map execution blocked by policy: map.execute")
+            return 1
+
         try:
             result = execute_map_action(args.site, args.flow, inputs, root=Path.cwd())
         except (MapExecutionError, UnsupportedExecutionError) as error:
@@ -449,7 +481,18 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 )
             if args.json_output:
-                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error), "error_code": getattr(error, "error_code", "UNKNOWN_ERROR")}))
+                print(json.dumps({
+                    "ok": False,
+                    "executed": False,
+                    "site": args.site,
+                    "flow": args.flow,
+                    "error": str(error),
+                    "error_code": getattr(error, "error_code", "UNKNOWN_ERROR"),
+                    "policy": execute_policy_explanation.policy_name,
+                    "decision": execute_policy_decision,
+                    "policy_source": execute_policy_explanation.source,
+                    "policy_reason": execute_policy_explanation.reason,
+                }))
                 return 1
             print(str(error))
             return 1
@@ -470,7 +513,17 @@ def main(argv: list[str] | None = None) -> int:
                 print("Runewall is not initialized; execution was not logged.")
 
         if args.json_output:
-            print(json.dumps({"ok": True, "executed": True, "site": args.site, "flow": args.flow, "result": result}))
+            print(json.dumps({
+                "ok": True,
+                "executed": True,
+                "site": args.site,
+                "flow": args.flow,
+                "result": result,
+                "policy": execute_policy_explanation.policy_name,
+                "decision": execute_policy_decision,
+                "policy_source": execute_policy_explanation.source,
+                "policy_reason": execute_policy_explanation.reason,
+            }))
             return 0
 
         if args.site.lower() == "vercel":
