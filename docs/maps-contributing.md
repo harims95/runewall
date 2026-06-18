@@ -156,6 +156,50 @@ A map without execution is still useful. Users and agents can use it for plannin
 
 ---
 
+## Discovering maps
+
+Category and tags make maps discoverable by agents and automation tools without reading every map file manually.
+
+Filter by category:
+
+```bash
+runewall maps list --category deployment
+runewall maps list --category communication
+```
+
+Filter by tag:
+
+```bash
+runewall maps list --tag chat
+runewall maps list --tag deploy
+```
+
+Combine both:
+
+```bash
+runewall maps list --category deployment --tag hosting
+```
+
+Search across map key, site name, category, tags, flow names, and flow descriptions:
+
+```bash
+runewall maps search deploy
+runewall maps search chat
+```
+
+For automation:
+
+```bash
+runewall maps list --category deployment --json
+runewall maps search deploy --json
+```
+
+`maps search QUERY --json` returns `{"query": "...", "count": N, "maps": [...]}`.
+
+If nothing matches, count is 0 and maps is an empty array.
+
+---
+
 ## Validating your map
 
 After adding a map, run the validation command:

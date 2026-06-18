@@ -323,6 +323,26 @@ runewall maps validate
 runewall maps path
 ```
 
+Filter maps by category or tag:
+
+```bash
+runewall maps list --category deployment
+runewall maps list --tag chat
+runewall maps list --category deployment --json
+```
+
+Categories group maps by purpose (`deployment`, `communication`, `development`, `infrastructure`, `backend`, `project_management`). Tags help agents discover maps by capability.
+
+Search across map key, site name, category, tags, flow names, and flow descriptions:
+
+```bash
+runewall maps search deploy
+runewall maps search chat
+runewall maps search unknown --json
+```
+
+`maps search QUERY --json` returns `{"query": "...", "count": N, "maps": [...]}`. Count is 0 and maps is empty if nothing matches.
+
 Plan a mapped action safely with:
 
 ```bash
