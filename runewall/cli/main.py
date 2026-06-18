@@ -163,13 +163,13 @@ def main(argv: list[str] | None = None) -> int:
             plan = planner.build_plan(args.site, args.flow, inputs)
         except SiteMapNotFoundError as error:
             if args.json_output:
-                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error)}))
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": f"Unknown site: {args.site}"}))
             else:
                 print(str(error))
             return 1
         except FlowNotFoundError as error:
             if args.json_output:
-                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": str(error)}))
+                print(json.dumps({"ok": False, "executed": False, "site": args.site, "flow": args.flow, "error": f"Unknown flow: {args.flow}"}))
             else:
                 print(str(error))
             return 1

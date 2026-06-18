@@ -1552,6 +1552,45 @@ class CliTests(unittest.TestCase):
         self.assertIn("Risk level: low", rendered)
         self.assertIn("Missing inputs: none", rendered)
 
+    def test_act_dry_run_json_unknown_site_prints_valid_json_error(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["act", "unknown_site", "create_issue", "--dry-run", "--json"])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "unknown_site")
+        self.assertEqual(data["flow"], "create_issue")
+        self.assertIn("Unknown site", data["error"])
+
+    def test_act_dry_run_json_unknown_flow_prints_valid_json_error(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["act", "github", "unknown_flow", "--dry-run", "--json"])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["executed"])
+        self.assertEqual(data["site"], "github")
+        self.assertEqual(data["flow"], "unknown_flow")
+        self.assertIn("Unknown flow", data["error"])
+
+    def test_act_dry_run_human_error_output_unchanged_for_unknown_site_and_flow(self) -> None:
+        site_output = io.StringIO()
+        with redirect_stdout(site_output):
+            exit_code_site = main(["act", "unknown_site", "create_issue", "--dry-run"])
+        self.assertEqual(exit_code_site, 1)
+        self.assertEqual(site_output.getvalue().strip(), "Site map not found: unknown_site")
+
+        flow_output = io.StringIO()
+        with redirect_stdout(flow_output):
+            exit_code_flow = main(["act", "github", "unknown_flow", "--dry-run"])
+        self.assertEqual(exit_code_flow, 1)
+        self.assertEqual(flow_output.getvalue().strip(), "Flow not found for GitHub: unknown_flow")
+
     def test_maps_list_json_prints_valid_json(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
