@@ -738,6 +738,11 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_manifest_inspect_parser = maps_community_manifest_subcommands.add_parser("inspect", help="Inspect a local community map manifest file.")
     maps_community_manifest_inspect_parser.add_argument("path")
     maps_community_manifest_inspect_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_package_parser = maps_community_subcommands.add_parser("package", help="Inspect a local community map package directory.")
+    maps_community_package_subcommands = maps_community_package_parser.add_subparsers(dest="maps_community_package_command", required=True)
+    maps_community_package_inspect_parser = maps_community_package_subcommands.add_parser("inspect", help="Inspect a local community map package directory.")
+    maps_community_package_inspect_parser.add_argument("path")
+    maps_community_package_inspect_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1560,6 +1565,57 @@ def main(argv: list[str] | None = None) -> int:
                         for error in report.errors:
                             print(f"- {error}")
                     return 0 if report.ok else 1
+            if args.maps_community_command == "package":
+                if args.maps_community_package_command == "inspect":
+                    pkg = registry.inspect_package_directory(Path(args.path))
+                    _signing: dict[str, object] = {"implemented": False, "verified": False}
+                    _checksums: dict[str, object] = {"implemented": True, "verified": pkg.checksums_verified}
+                    _safety: dict[str, object] = {"execute_enabled": False, "remote_downloads": False, "external_api_calls": False}
+                    if args.json_output:
+                        if pkg.ok:
+                            print(json.dumps({
+                                "ok": True,
+                                "path": pkg.path,
+                                "manifest": pkg.manifest_path,
+                                "name": pkg.name,
+                                "version": pkg.version,
+                                "maps_count": pkg.maps_count,
+                                "validation": {
+                                    "ok": True,
+                                    "errors": [],
+                                    "warnings": pkg.validation_warnings,
+                                },
+                                "checksums": _checksums,
+                                "signing": _signing,
+                                "safety": _safety,
+                            }))
+                            return 0
+                        print(json.dumps({
+                            "ok": False,
+                            "path": pkg.path,
+                            "errors": pkg.errors + pkg.validation_errors,
+                            "checksums": _checksums,
+                            "signing": _signing,
+                            "safety": _safety,
+                        }))
+                        return 1
+                    print("Community map package inspect")
+                    print("")
+                    print(f"Path: {pkg.path}")
+                    print(f"Manifest: {pkg.manifest_path or '-'}")
+                    print(f"Name: {pkg.name or '-'}")
+                    print(f"Version: {pkg.version or '-'}")
+                    print(f"Maps: {pkg.maps_count}")
+                    print(f"Validation: {'OK' if pkg.validation_ok else 'FAILED'}")
+                    print(f"Checksums: {'OK' if pkg.checksums_verified else 'failed'}")
+                    print("Signing: not implemented")
+                    print("Execute enabled: false")
+                    all_errors = pkg.errors + pkg.validation_errors
+                    if all_errors:
+                        print("")
+                        for error in all_errors:
+                            print(f"- {error}")
+                    return 0 if pkg.ok else 1
         if args.maps_command == "list":
             site_maps = registry.list_maps()
             if args.category:

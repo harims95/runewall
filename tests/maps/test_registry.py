@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, SiteMapRegistry
+from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageInspectReport, SiteMapRegistry
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -533,6 +533,52 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertFalse(report.ok)
         self.assertFalse(report.checksums_verified)
         self.assertTrue(any("map file not found" in e for e in report.errors))
+
+    def test_inspect_package_directory_passes_for_example(self) -> None:
+        registry = SiteMapRegistry()
+        pkg = registry.inspect_package_directory(ROOT / "examples" / "community-maps")
+        self.assertIsInstance(pkg, PackageInspectReport)
+        self.assertTrue(pkg.ok)
+        self.assertEqual(pkg.name, "github-safe-issue-map")
+        self.assertEqual(pkg.maps_count, 1)
+        self.assertTrue(pkg.checksums_verified)
+        self.assertEqual(pkg.errors, [])
+        self.assertEqual(pkg.validation_errors, [])
+
+    def test_inspect_package_directory_fails_for_missing_directory(self) -> None:
+        registry = SiteMapRegistry()
+        pkg = registry.inspect_package_directory(Path("no-such-dir"))
+        self.assertFalse(pkg.ok)
+        self.assertTrue(any("directory not found" in e for e in pkg.errors))
+
+    def test_inspect_package_directory_fails_for_no_manifest(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pkg = registry.inspect_package_directory(Path(temp_dir))
+        self.assertFalse(pkg.ok)
+        self.assertTrue(any("manifest" in e for e in pkg.errors))
+
+    def test_inspect_package_directory_fails_for_wrong_checksum(self) -> None:
+        import hashlib as _hashlib
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_content = b'{"site":"github","flow":"f","action_type":"map.dry_run"}'
+            (Path(temp_dir) / "mymap.json").write_bytes(map_content)
+            (Path(temp_dir) / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": "sha256-wrong"},
+                }),
+                encoding="utf-8",
+            )
+            pkg = registry.inspect_package_directory(Path(temp_dir))
+        self.assertFalse(pkg.ok)
+        self.assertFalse(pkg.checksums_verified)
+        self.assertTrue(any("checksum mismatch" in e for e in pkg.validation_errors))
 
 
 if __name__ == "__main__":

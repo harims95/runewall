@@ -575,6 +575,81 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["ok"])
         self.assertTrue(any("map file not found" in e for e in data["errors"]))
 
+    def test_package_inspect_example_exits_zero(self) -> None:
+        example_dir = ROOT / "examples" / "community-maps"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "package", "inspect", str(example_dir)])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map package inspect", rendered)
+        self.assertIn("Name: github-safe-issue-map", rendered)
+        self.assertIn("Validation: OK", rendered)
+        self.assertIn("Checksums: OK", rendered)
+        self.assertIn("Signing: not implemented", rendered)
+        self.assertIn("Execute enabled: false", rendered)
+
+    def test_package_inspect_example_json_returns_ok_true(self) -> None:
+        example_dir = ROOT / "examples" / "community-maps"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "package", "inspect", str(example_dir), "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["name"], "github-safe-issue-map")
+        self.assertEqual(data["maps_count"], 1)
+        self.assertTrue(data["checksums"]["verified"])
+        self.assertTrue(data["checksums"]["implemented"])
+        self.assertFalse(data["signing"]["implemented"])
+        self.assertFalse(data["safety"]["execute_enabled"])
+        self.assertFalse(data["safety"]["remote_downloads"])
+        self.assertFalse(data["safety"]["external_api_calls"])
+
+    def test_package_inspect_missing_directory_returns_failure(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "package", "inspect", "no-such-dir", "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("directory not found" in e for e in data["errors"]))
+
+    def test_package_inspect_directory_without_manifest_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "package", "inspect", temp_dir, "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("manifest" in e for e in data["errors"]))
+
+    def test_package_inspect_wrong_checksum_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "mymap.json").write_text(
+                '{"site":"github","flow":"f","action_type":"map.dry_run"}', encoding="utf-8"
+            )
+            (Path(temp_dir) / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": "sha256-wrong"},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "package", "inspect", temp_dir, "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["checksums"]["verified"])
+        self.assertTrue(any("checksum mismatch" in e for e in data["errors"]))
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

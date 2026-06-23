@@ -97,9 +97,11 @@ runewall maps community manifest inspect <path>
 runewall maps community manifest inspect <path> --json
 ```
 
-`manifest validate` — parse and check required fields, safety flags, and checksum field presence. Signing and checksum verification are not yet implemented.
+`manifest validate` — parse and check required fields, safety flags, and verify local SHA-256 checksums. Signing verification is not yet implemented.
 
-`manifest inspect` — report manifest metadata (name, version, author, maps count, validation result) without importing or executing anything.
+`manifest inspect` — report manifest metadata (name, version, author, maps count, validation result, checksum status) without importing or executing anything.
+
+`package inspect` — inspect a local package directory. Finds `manifest.json` or `manifest.example.json`, runs manifest validation and checksum verification, and reports the full safety posture. Does not import or execute.
 
 Future (not yet implemented):
 

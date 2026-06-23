@@ -86,6 +86,21 @@ class ManifestValidationReport:
     checksums_verified: bool = False
 
 
+@dataclass(frozen=True)
+class PackageInspectReport:
+    ok: bool
+    path: str
+    manifest_path: str | None
+    errors: list[str]
+    name: str | None
+    version: str | None
+    maps_count: int
+    validation_ok: bool
+    validation_errors: list[str]
+    validation_warnings: list[str]
+    checksums_verified: bool
+
+
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
 _COMMUNITY_SECRET_KEYS = ("token", "api_key", "secret", "password", "private_key")
 _MANIFEST_REQUIRED_STR = ("manifest_version", "name", "version", "description")
@@ -408,6 +423,56 @@ class SiteMapRegistry:
 
     def inspect_manifest_file(self, path: Path) -> ManifestValidationReport:
         return self.validate_manifest_file(path)
+
+    def inspect_package_directory(self, path: Path) -> PackageInspectReport:
+        resolved_path = str(path)
+
+        if not path.exists():
+            return PackageInspectReport(
+                ok=False, path=resolved_path, manifest_path=None,
+                errors=[f"directory not found: {resolved_path}"],
+                name=None, version=None, maps_count=0,
+                validation_ok=False, validation_errors=[], validation_warnings=[],
+                checksums_verified=False,
+            )
+        if not path.is_dir():
+            return PackageInspectReport(
+                ok=False, path=resolved_path, manifest_path=None,
+                errors=[f"not a directory: {resolved_path}"],
+                name=None, version=None, maps_count=0,
+                validation_ok=False, validation_errors=[], validation_warnings=[],
+                checksums_verified=False,
+            )
+
+        manifest_path: Path | None = None
+        if (path / "manifest.json").is_file():
+            manifest_path = path / "manifest.json"
+        elif (path / "manifest.example.json").is_file():
+            manifest_path = path / "manifest.example.json"
+
+        if manifest_path is None:
+            return PackageInspectReport(
+                ok=False, path=resolved_path, manifest_path=None,
+                errors=["no manifest.json or manifest.example.json found in directory"],
+                name=None, version=None, maps_count=0,
+                validation_ok=False, validation_errors=[], validation_warnings=[],
+                checksums_verified=False,
+            )
+
+        report = self.validate_manifest_file(manifest_path)
+        return PackageInspectReport(
+            ok=report.ok,
+            path=resolved_path,
+            manifest_path=str(manifest_path),
+            errors=[],
+            name=report.name,
+            version=report.version,
+            maps_count=report.maps_count,
+            validation_ok=report.ok,
+            validation_errors=report.errors,
+            validation_warnings=report.warnings,
+            checksums_verified=report.checksums_verified,
+        )
 
     def _load_community_map_data(self, path: Path) -> dict[str, Any]:
         if not path.exists() or not path.is_file():

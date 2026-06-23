@@ -53,6 +53,16 @@ v0.5 community maps are local-only and non-executable.
 
 See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the manifest format.
 
+## Package inspect
+
+`runewall maps community package inspect <directory>` inspects a local community map package directory.
+
+- Looks for `manifest.json` first, then `manifest.example.json`.
+- Validates the manifest using the same logic as `manifest validate`.
+- Verifies local SHA-256 checksums.
+- Shows name, version, maps count, validation result, checksum status, and safety posture.
+- Does not import, install, or execute anything.
+
 ## Future signed manifests
 
 Signing verification is future work.
@@ -80,4 +90,6 @@ runewall maps community manifest validate examples/community-maps/manifest.examp
 runewall maps community manifest validate examples/community-maps/manifest.example.json --json
 runewall maps community manifest inspect examples/community-maps/manifest.example.json
 runewall maps community manifest inspect examples/community-maps/manifest.example.json --json
+runewall maps community package inspect examples/community-maps
+runewall maps community package inspect examples/community-maps --json
 ```
