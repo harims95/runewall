@@ -63,6 +63,18 @@ See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the manifest
 - Shows name, version, maps count, validation result, checksum status, and safety posture.
 - Does not import, install, or execute anything.
 
+## Package import
+
+`runewall maps community package import <directory>` imports map files from a local community map package.
+
+- Looks for `manifest.json` first, then `manifest.example.json`.
+- Validates the manifest and verifies local SHA-256 checksums before copying anything.
+- If validation or checksum verification fails, nothing is copied.
+- On success, copies map files listed in `manifest.maps` into `.runewall/community-maps/`.
+- Preserves original map filenames.
+- Does not import the manifest itself as an executable map.
+- Does not execute anything. Imported community maps remain non-executable.
+
 ## Future signed manifests
 
 Signing verification is future work.
@@ -92,4 +104,6 @@ runewall maps community manifest inspect examples/community-maps/manifest.exampl
 runewall maps community manifest inspect examples/community-maps/manifest.example.json --json
 runewall maps community package inspect examples/community-maps
 runewall maps community package inspect examples/community-maps --json
+runewall maps community package import examples/community-maps
+runewall maps community package import examples/community-maps --json
 ```

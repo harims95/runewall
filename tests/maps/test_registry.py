@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageInspectReport, SiteMapRegistry
+from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageImportReport, PackageInspectReport, SiteMapRegistry
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -579,6 +579,68 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertFalse(pkg.ok)
         self.assertFalse(pkg.checksums_verified)
         self.assertTrue(any("checksum mismatch" in e for e in pkg.validation_errors))
+
+    def test_import_package_directory_passes_for_example(self) -> None:
+        registry = SiteMapRegistry()
+        example_dir = ROOT / "examples" / "community-maps"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = registry.import_package_directory(example_dir, Path(temp_dir))
+            imported_path = Path(temp_dir) / ".runewall" / "community-maps" / "github_create_issue.safe.json"
+            file_exists = imported_path.exists()
+        self.assertIsInstance(result, PackageImportReport)
+        self.assertTrue(result.ok)
+        self.assertTrue(result.validated)
+        self.assertTrue(result.checksums_verified)
+        self.assertFalse(result.execute_enabled)
+        self.assertIn(".runewall/community-maps/github_create_issue.safe.json", result.imported_maps)
+        self.assertTrue(file_exists)
+
+    def test_import_package_directory_fails_for_missing_directory(self) -> None:
+        registry = SiteMapRegistry()
+        result = registry.import_package_directory(Path("no-such-dir"))
+        self.assertFalse(result.ok)
+        self.assertFalse(result.validated)
+        self.assertTrue(any("directory not found" in e for e in result.errors))
+
+    def test_import_package_directory_fails_for_no_manifest(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = registry.import_package_directory(Path(temp_dir))
+        self.assertFalse(result.ok)
+        self.assertFalse(result.validated)
+        self.assertTrue(any("manifest" in e for e in result.errors))
+
+    def test_import_package_directory_fails_for_wrong_checksum_and_imports_nothing(self) -> None:
+        import hashlib as _hashlib
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as pkg_dir, tempfile.TemporaryDirectory() as root_dir:
+            map_content = b'{"site":"github","flow":"f","action_type":"map.dry_run"}'
+            (Path(pkg_dir) / "mymap.json").write_bytes(map_content)
+            (Path(pkg_dir) / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": "sha256-wrong"},
+                }),
+                encoding="utf-8",
+            )
+            result = registry.import_package_directory(Path(pkg_dir), Path(root_dir))
+            imported_path = Path(root_dir) / ".runewall" / "community-maps" / "mymap.json"
+            file_exists = imported_path.exists()
+        self.assertFalse(result.ok)
+        self.assertFalse(result.checksums_verified)
+        self.assertFalse(file_exists)
+        self.assertEqual(result.imported_maps, [])
+
+    def test_import_package_directory_execute_enabled_false(self) -> None:
+        registry = SiteMapRegistry()
+        example_dir = ROOT / "examples" / "community-maps"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = registry.import_package_directory(example_dir, Path(temp_dir))
+        self.assertFalse(result.execute_enabled)
 
 
 if __name__ == "__main__":

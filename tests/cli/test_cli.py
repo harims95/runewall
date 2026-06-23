@@ -650,6 +650,96 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["checksums"]["verified"])
         self.assertTrue(any("checksum mismatch" in e for e in data["errors"]))
 
+    def test_package_import_example_exits_zero(self) -> None:
+        example_dir = ROOT / "examples" / "community-maps"
+        original_cwd = Path.cwd()
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "package", "import", str(example_dir)])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Community map package import: OK", output.getvalue())
+        self.assertIn(".runewall/community-maps/github_create_issue.safe.json", output.getvalue())
+
+    def test_package_import_example_json_returns_ok_true(self) -> None:
+        example_dir = ROOT / "examples" / "community-maps"
+        original_cwd = Path.cwd()
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "package", "import", str(example_dir), "--json"])
+                imported_path = Path(temp_dir) / ".runewall" / "community-maps" / "github_create_issue.safe.json"
+                file_exists = imported_path.exists()
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["validated"])
+        self.assertTrue(data["checksums"]["verified"])
+        self.assertFalse(data["execute_enabled"])
+        self.assertFalse(data["signing"]["implemented"])
+        self.assertIn(".runewall/community-maps/github_create_issue.safe.json", data["imported_maps"])
+        self.assertTrue(file_exists)
+
+    def test_package_import_missing_directory_fails(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "package", "import", "no-such-dir", "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("directory not found" in e for e in data["errors"]))
+
+    def test_package_import_directory_without_manifest_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "package", "import", temp_dir, "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("manifest" in e for e in data["errors"]))
+
+    def test_package_import_wrong_checksum_fails_and_imports_nothing(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as pkg_dir, tempfile.TemporaryDirectory() as root_dir:
+            (Path(pkg_dir) / "mymap.json").write_text(
+                '{"site":"github","flow":"f","action_type":"map.dry_run"}', encoding="utf-8"
+            )
+            (Path(pkg_dir) / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": "sha256-wrong"},
+                }),
+                encoding="utf-8",
+            )
+            try:
+                os.chdir(root_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "package", "import", pkg_dir, "--json"])
+                imported_path = Path(root_dir) / ".runewall" / "community-maps" / "mymap.json"
+                file_exists = imported_path.exists()
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["checksums"]["verified"])
+        self.assertEqual(data["imported_maps"], [])
+        self.assertFalse(file_exists)
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

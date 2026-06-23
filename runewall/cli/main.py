@@ -743,6 +743,9 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_package_inspect_parser = maps_community_package_subcommands.add_parser("inspect", help="Inspect a local community map package directory.")
     maps_community_package_inspect_parser.add_argument("path")
     maps_community_package_inspect_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_package_import_parser = maps_community_package_subcommands.add_parser("import", help="Import map files from a local community map package.")
+    maps_community_package_import_parser.add_argument("path")
+    maps_community_package_import_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1616,6 +1619,43 @@ def main(argv: list[str] | None = None) -> int:
                         for error in all_errors:
                             print(f"- {error}")
                     return 0 if pkg.ok else 1
+                if args.maps_community_package_command == "import":
+                    result = registry.import_package_directory(Path(args.path), Path.cwd())
+                    _signing: dict[str, object] = {"implemented": False, "verified": False}
+                    _checksums: dict[str, object] = {"implemented": True, "verified": result.checksums_verified}
+                    if args.json_output:
+                        if result.ok:
+                            print(json.dumps({
+                                "ok": True,
+                                "source": result.source,
+                                "manifest": result.manifest_path,
+                                "validated": True,
+                                "checksums": _checksums,
+                                "signing": _signing,
+                                "imported_maps": result.imported_maps,
+                                "execute_enabled": False,
+                            }))
+                            return 0
+                        print(json.dumps({
+                            "ok": False,
+                            "source": result.source,
+                            "errors": result.errors,
+                            "validated": result.validated,
+                            "checksums": _checksums,
+                            "imported_maps": [],
+                            "execute_enabled": False,
+                        }))
+                        return 1
+                    if result.ok:
+                        print("Community map package import: OK")
+                        print("Imported maps:")
+                        for imported_path in result.imported_maps:
+                            print(f"- {imported_path}")
+                    else:
+                        print("Community map package import: FAILED")
+                        for error in result.errors:
+                            print(f"- {error}")
+                    return 0 if result.ok else 1
         if args.maps_command == "list":
             site_maps = registry.list_maps()
             if args.category:

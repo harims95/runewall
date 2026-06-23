@@ -103,6 +103,8 @@ runewall maps community manifest inspect <path> --json
 
 `package inspect` — inspect a local package directory. Finds `manifest.json` or `manifest.example.json`, runs manifest validation and checksum verification, and reports the full safety posture. Does not import or execute.
 
+`package import` — validate, verify checksums, then copy map files from the package directory into `.runewall/community-maps/`. Nothing is copied if validation or checksum verification fails. Imported maps remain non-executable.
+
 Future (not yet implemented):
 
 ```

@@ -101,6 +101,18 @@ class PackageInspectReport:
     checksums_verified: bool
 
 
+@dataclass(frozen=True)
+class PackageImportReport:
+    ok: bool
+    source: str
+    manifest_path: str | None
+    errors: list[str]
+    validated: bool
+    checksums_verified: bool
+    imported_maps: list[str]
+    execute_enabled: bool
+
+
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
 _COMMUNITY_SECRET_KEYS = ("token", "api_key", "secret", "password", "private_key")
 _MANIFEST_REQUIRED_STR = ("manifest_version", "name", "version", "description")
@@ -472,6 +484,71 @@ class SiteMapRegistry:
             validation_errors=report.errors,
             validation_warnings=report.warnings,
             checksums_verified=report.checksums_verified,
+        )
+
+    def import_package_directory(self, path: Path, root: Path | None = None) -> PackageImportReport:
+        resolved_path = str(path)
+
+        if not path.exists():
+            return PackageImportReport(
+                ok=False, source=resolved_path, manifest_path=None,
+                errors=[f"directory not found: {resolved_path}"],
+                validated=False, checksums_verified=False,
+                imported_maps=[], execute_enabled=False,
+            )
+        if not path.is_dir():
+            return PackageImportReport(
+                ok=False, source=resolved_path, manifest_path=None,
+                errors=[f"not a directory: {resolved_path}"],
+                validated=False, checksums_verified=False,
+                imported_maps=[], execute_enabled=False,
+            )
+
+        manifest_path: Path | None = None
+        if (path / "manifest.json").is_file():
+            manifest_path = path / "manifest.json"
+        elif (path / "manifest.example.json").is_file():
+            manifest_path = path / "manifest.example.json"
+
+        if manifest_path is None:
+            return PackageImportReport(
+                ok=False, source=resolved_path, manifest_path=None,
+                errors=["no manifest.json or manifest.example.json found in directory"],
+                validated=False, checksums_verified=False,
+                imported_maps=[], execute_enabled=False,
+            )
+
+        report = self.validate_manifest_file(manifest_path)
+        if not report.ok:
+            return PackageImportReport(
+                ok=False, source=resolved_path, manifest_path=str(manifest_path),
+                errors=report.errors, validated=False,
+                checksums_verified=report.checksums_verified,
+                imported_maps=[], execute_enabled=False,
+            )
+
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        maps_list = data.get("maps", [])
+
+        destination_dir = self.community_maps_path(root)
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        imported: list[str] = []
+        for entry in maps_list:
+            if not isinstance(entry, dict):
+                continue
+            map_path_str = entry.get("path")
+            if not isinstance(map_path_str, str) or not map_path_str.strip():
+                continue
+            src = path / map_path_str
+            dst = destination_dir / Path(map_path_str).name
+            shutil.copy2(src, dst)
+            imported.append((Path(".runewall") / "community-maps" / Path(map_path_str).name).as_posix())
+
+        return PackageImportReport(
+            ok=True, source=resolved_path, manifest_path=str(manifest_path),
+            errors=[], validated=True, checksums_verified=True,
+            imported_maps=imported, execute_enabled=False,
         )
 
     def _load_community_map_data(self, path: Path) -> dict[str, Any]:
