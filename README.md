@@ -75,6 +75,19 @@ runewall mcp serve
 
 See [docs/MCP_CLIENT_EXAMPLES.md](docs/MCP_CLIENT_EXAMPLES.md) for PowerShell smoke tests, supported methods, and supported tools.
 
+## Python SDK preview
+
+```python
+from runewall.sdk import policy_test, dry_run
+
+print(policy_test("map.execute"))
+print(dry_run("github", "create_issue", {"repo": "user/repo", "title": "Bug"}))
+```
+
+- SDK is local-only.
+- `execute` is not exposed yet.
+- `dry_run` does not call external APIs.
+
 ## Quickstart
 
 ```bash
