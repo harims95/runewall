@@ -407,6 +407,38 @@ def _maps_show_result(site: str, *, flow: str | None = None) -> dict[str, object
     }
 
 
+def _dry_run_mcp_result(site: str, flow: str, inputs: dict[str, object], root: Path) -> dict[str, object] | None:
+    planner = DryRunPlanner()
+    normalized_inputs = {str(key): str(value) for key, value in inputs.items()}
+    try:
+        plan = planner.build_plan(site, flow, normalized_inputs)
+    except (SiteMapNotFoundError, FlowNotFoundError):
+        return None
+
+    policy_explanation = explain_policy("map.dry_run", load_config(root))
+    policy_decision = decision_for_policy(policy_explanation.policy)
+    return {
+        "ok": True,
+        "dry_run": True,
+        "executed": False,
+        "site": site,
+        "flow": flow,
+        "description": plan.description,
+        "risk_level": plan.risk_level,
+        "reversible": plan.reversible,
+        "requires_auth": plan.requires_auth,
+        "provided_inputs": plan.provided_inputs,
+        "missing_inputs": plan.missing_inputs,
+        "api_path": plan.api_path,
+        "ui_steps_count": plan.ui_steps_count,
+        "policy": policy_explanation.policy_name,
+        "decision": policy_decision,
+        "policy_source": policy_explanation.source,
+        "policy_reason": policy_explanation.reason,
+        "action_preview": dry_run_result(plan),
+    }
+
+
 def _mcp_once_response(raw_message: str) -> dict[str, object]:
     try:
         request = json.loads(raw_message)
@@ -460,6 +492,18 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
             if not isinstance(arguments.get("flow"), str):
                 return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: flow"})
             tool_result = _maps_show_result(arguments["site"], flow=arguments["flow"])
+            if tool_result is None:
+                return _jsonrpc_response(message_id, error={"code": -32602, "message": "Map not found"})
+        elif tool_name == "runewall.dry_run":
+            arguments = params.get("arguments")
+            if not isinstance(arguments, dict) or not isinstance(arguments.get("site"), str):
+                return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: site"})
+            if not isinstance(arguments.get("flow"), str):
+                return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: flow"})
+            inputs = arguments.get("inputs", {})
+            if not isinstance(inputs, dict):
+                inputs = {}
+            tool_result = _dry_run_mcp_result(arguments["site"], arguments["flow"], inputs, Path.cwd())
             if tool_result is None:
                 return _jsonrpc_response(message_id, error={"code": -32602, "message": "Map not found"})
         else:
