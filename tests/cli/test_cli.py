@@ -5242,6 +5242,15 @@ class CliTests(unittest.TestCase):
                 "python -m pytest tests -v",
             ],
         )
+        self.assertIn("runewall release check", data["recommended_commands"])
+        self.assertNotIn("runewall releasecheck", data["recommended_commands"])
+
+    def test_release_status_human_output_includes_release_check(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "status"])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("runewall release check", output.getvalue())
 
     @patch("runewall.cli.main.importlib.util.find_spec")
     def test_release_check_json_returns_valid_json(self, mocked_find_spec) -> None:
