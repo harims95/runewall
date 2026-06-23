@@ -85,19 +85,26 @@ See [examples/community-maps/manifest.example.json](../examples/community-maps/m
 - remote downloads are future work
 - signed verification is future work
 
-## 5. Future commands
+## 5. Commands
 
-Not implemented. Planned for a future release:
+`manifest validate` and `manifest inspect` are implemented in v0.5.1.
 
 ```
 runewall maps community manifest validate <path>
+runewall maps community manifest validate <path> --json
 runewall maps community manifest inspect <path>
-runewall maps community verify <path>
+runewall maps community manifest inspect <path> --json
 ```
 
-`manifest validate` — parse and check required fields, safety flags, and checksum presence.
+`manifest validate` — parse and check required fields, safety flags, and checksum field presence. Signing and checksum verification are not yet implemented.
 
-`manifest inspect` — report manifest metadata without importing or executing anything.
+`manifest inspect` — report manifest metadata (name, version, author, maps count, validation result) without importing or executing anything.
+
+Future (not yet implemented):
+
+```
+runewall maps community verify <path>
+```
 
 `verify` — compare declared checksums against actual file hashes (requires checksum implementation).
 

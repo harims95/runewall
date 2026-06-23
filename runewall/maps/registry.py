@@ -72,8 +72,23 @@ class CommunityMapInspectReport:
     contains_secrets: bool
 
 
+@dataclass(frozen=True)
+class ManifestValidationReport:
+    ok: bool
+    path: str
+    errors: list[str]
+    warnings: list[str]
+    name: str | None = None
+    version: str | None = None
+    author_name: str | None = None
+    maps_count: int = 0
+
+
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
 _COMMUNITY_SECRET_KEYS = ("token", "api_key", "secret", "password", "private_key")
+_MANIFEST_REQUIRED_STR = ("manifest_version", "name", "version", "description")
+_MANIFEST_REQUIRED_DICT = ("author", "permissions", "safety", "checksums")
+_MANIFEST_MAP_REQUIRED = ("path", "site", "flow", "action_type")
 
 
 def lint_map(site_map: SiteMap) -> tuple[list[str], list[str]]:
@@ -306,6 +321,87 @@ class SiteMapRegistry:
             key=lambda entry: entry.name,
         )
 
+    def validate_manifest_file(self, path: Path) -> ManifestValidationReport:
+        errors: list[str] = []
+        resolved_path = str(path)
+
+        if not path.exists():
+            return ManifestValidationReport(ok=False, path=resolved_path, errors=[f"file not found: {resolved_path}"], warnings=[])
+        if not path.is_file():
+            return ManifestValidationReport(ok=False, path=resolved_path, errors=[f"not a file: {resolved_path}"], warnings=[])
+
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except json.JSONDecodeError as exc:
+            return ManifestValidationReport(ok=False, path=resolved_path, errors=[f"invalid JSON: {exc.msg}"], warnings=[])
+
+        if not isinstance(data, dict):
+            return ManifestValidationReport(ok=False, path=resolved_path, errors=["manifest must be a JSON object"], warnings=[])
+
+        name = data.get("name") if isinstance(data.get("name"), str) and str(data.get("name", "")).strip() else None
+        version = data.get("version") if isinstance(data.get("version"), str) and str(data.get("version", "")).strip() else None
+        author_obj = data.get("author") if isinstance(data.get("author"), dict) else None
+        author_name = str(author_obj["name"]) if author_obj and isinstance(author_obj.get("name"), str) and str(author_obj["name"]).strip() else None
+        maps_list = data.get("maps") if isinstance(data.get("maps"), list) else None
+        maps_count = len(maps_list) if maps_list is not None else 0
+
+        for field in _MANIFEST_REQUIRED_STR:
+            if not isinstance(data.get(field), str) or not str(data.get(field, "")).strip():
+                errors.append(f"missing required field '{field}'")
+        for field in _MANIFEST_REQUIRED_DICT:
+            if not isinstance(data.get(field), dict):
+                errors.append(f"missing required field '{field}'")
+        if not isinstance(data.get("maps"), list):
+            errors.append("missing required field 'maps'")
+
+        if author_obj is not None and (not isinstance(author_obj.get("name"), str) or not str(author_obj.get("name", "")).strip()):
+            errors.append("author.name is required")
+
+        if maps_list is not None:
+            if not maps_list:
+                errors.append("maps must not be empty")
+            for i, entry in enumerate(maps_list):
+                if not isinstance(entry, dict):
+                    errors.append(f"maps[{i}] must be an object")
+                    continue
+                for field in _MANIFEST_MAP_REQUIRED:
+                    if not isinstance(entry.get(field), str) or not str(entry.get(field, "")).strip():
+                        errors.append(f"maps[{i}] missing required field '{field}'")
+
+        perms = data.get("permissions")
+        if isinstance(perms, dict):
+            if perms.get("external_api_calls") is not False:
+                errors.append("permissions.external_api_calls must be false")
+            if perms.get("execute_enabled") is not False:
+                errors.append("permissions.execute_enabled must be false")
+
+        safety_obj = data.get("safety")
+        if isinstance(safety_obj, dict):
+            if safety_obj.get("secrets_in_files") is not False:
+                errors.append("safety.secrets_in_files must be false")
+            if safety_obj.get("dry_run_first") is not True:
+                errors.append("safety.dry_run_first must be true")
+            if safety_obj.get("community_execution_allowed") is not False:
+                errors.append("safety.community_execution_allowed must be false")
+
+        for secret_key in self._find_manifest_secret_keys(data):
+            errors.append(f"secret-like field is not allowed: {secret_key}")
+
+        return ManifestValidationReport(
+            ok=not errors,
+            path=resolved_path,
+            errors=errors,
+            warnings=[],
+            name=name,
+            version=version,
+            author_name=author_name,
+            maps_count=maps_count,
+        )
+
+    def inspect_manifest_file(self, path: Path) -> ManifestValidationReport:
+        return self.validate_manifest_file(path)
+
     def _load_community_map_data(self, path: Path) -> dict[str, Any]:
         if not path.exists() or not path.is_file():
             return {}
@@ -364,6 +460,21 @@ class SiteMapRegistry:
             for index, item in enumerate(data):
                 item_prefix = f"{prefix}[{index}]"
                 matches.extend(self._find_matching_keys(item, patterns, prefix=item_prefix))
+        return matches
+
+    def _find_manifest_secret_keys(self, data: Any, *, prefix: str = "") -> list[str]:
+        """Return key paths matching secret patterns where the value is a non-empty string."""
+        matches: list[str] = []
+        if isinstance(data, dict):
+            for key, value in data.items():
+                key_text = str(key)
+                key_path = f"{prefix}.{key_text}" if prefix else key_text
+                if any(p in key_text.lower() for p in _COMMUNITY_SECRET_KEYS) and isinstance(value, str) and value.strip():
+                    matches.append(key_path)
+                matches.extend(self._find_manifest_secret_keys(value, prefix=key_path))
+        elif isinstance(data, list):
+            for index, item in enumerate(data):
+                matches.extend(self._find_manifest_secret_keys(item, prefix=f"{prefix}[{index}]"))
         return matches
 
     def _has_enabled_execution(self, data: Any) -> bool:

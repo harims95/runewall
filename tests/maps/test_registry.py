@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, MapValidationError, SiteMapRegistry
+from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, SiteMapRegistry
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -348,6 +348,121 @@ class SiteMapRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             files = registry.list_community_map_files(Path(temp_dir))
         self.assertEqual(files, [])
+
+    def test_validate_manifest_file_passes_for_example(self) -> None:
+        registry = SiteMapRegistry()
+        example_path = ROOT / "examples" / "community-maps" / "manifest.example.json"
+
+        report = registry.validate_manifest_file(example_path)
+
+        self.assertIsInstance(report, ManifestValidationReport)
+        self.assertTrue(report.ok)
+        self.assertEqual(report.errors, [])
+        self.assertEqual(report.name, "github-safe-issue-map")
+        self.assertEqual(report.version, "0.1.0")
+        self.assertEqual(report.author_name, "example-author")
+        self.assertEqual(report.maps_count, 1)
+
+    def test_validate_manifest_file_fails_for_missing_file(self) -> None:
+        registry = SiteMapRegistry()
+        report = registry.validate_manifest_file(Path("no-such-manifest.json"))
+        self.assertFalse(report.ok)
+        self.assertTrue(any("file not found" in e for e in report.errors))
+
+    def test_validate_manifest_file_fails_for_missing_name(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertFalse(report.ok)
+        self.assertTrue(any("name" in e for e in report.errors))
+
+    def test_validate_manifest_file_fails_for_secret_key_with_string_value(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                    "token": "abc123",
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertFalse(report.ok)
+        self.assertTrue(any("secret-like field" in e for e in report.errors))
+
+    def test_validate_manifest_file_passes_with_requires_tokens_false(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "requires_tokens": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertTrue(report.ok, report.errors)
+
+    def test_validate_manifest_file_fails_for_execute_enabled_true(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": True},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertFalse(report.ok)
+        self.assertTrue(any("execute_enabled" in e for e in report.errors))
+
+    def test_validate_manifest_file_fails_for_community_execution_allowed_true(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": True},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertFalse(report.ok)
+        self.assertTrue(any("community_execution_allowed" in e for e in report.errors))
 
 
 if __name__ == "__main__":

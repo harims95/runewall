@@ -70,4 +70,8 @@ runewall maps community validate path/to/map.json
 runewall maps community validate path/to/map.json --json
 runewall maps community validate examples/community-maps/github_create_issue.safe.json
 runewall maps community validate examples/community-maps/github_create_issue.safe.json --json
+runewall maps community manifest validate examples/community-maps/manifest.example.json
+runewall maps community manifest validate examples/community-maps/manifest.example.json --json
+runewall maps community manifest inspect examples/community-maps/manifest.example.json
+runewall maps community manifest inspect examples/community-maps/manifest.example.json --json
 ```

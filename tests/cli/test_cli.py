@@ -355,6 +355,151 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertIn(example_path.name, data["community_maps"])
 
+    def test_manifest_validate_example_exits_zero(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "manifest.example.json"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "manifest", "validate", str(example_path)])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Community map manifest validation: OK", output.getvalue())
+
+    def test_manifest_validate_example_json_returns_ok_true(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "manifest.example.json"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "manifest", "validate", str(example_path), "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["errors"], [])
+        self.assertFalse(data["signing"]["implemented"])
+        self.assertFalse(data["checksums"]["implemented"])
+
+    def test_manifest_inspect_example_exits_zero(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "manifest.example.json"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "manifest", "inspect", str(example_path)])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map manifest inspect", rendered)
+        self.assertIn("Name: github-safe-issue-map", rendered)
+        self.assertIn("Version: 0.1.0", rendered)
+        self.assertIn("Author: example-author", rendered)
+        self.assertIn("Maps: 1", rendered)
+        self.assertIn("Validation: OK", rendered)
+
+    def test_manifest_inspect_example_json_returns_ok_true(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "manifest.example.json"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "manifest", "inspect", str(example_path), "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["name"], "github-safe-issue-map")
+        self.assertEqual(data["maps_count"], 1)
+        self.assertTrue(data["validation"]["ok"])
+        self.assertFalse(data["signing"]["implemented"])
+
+    def test_manifest_validate_missing_file_returns_failure(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "manifest", "validate", "no-such-manifest.json", "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("file not found" in e for e in data["errors"]))
+
+    def test_manifest_validate_missing_name_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "manifest", "validate", str(path), "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("name" in e for e in data["errors"]))
+
+    def test_manifest_validate_secret_key_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for key in ("token", "secret", "password", "private_key"):
+                path = Path(temp_dir) / f"{key}.json"
+                path.write_text(
+                    json.dumps({
+                        "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                        "author": {"name": "a"},
+                        "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                        "permissions": {"external_api_calls": False, "execute_enabled": False},
+                        "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                        "checksums": {},
+                        key: "abc123",
+                    }),
+                    encoding="utf-8",
+                )
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "manifest", "validate", str(path), "--json"])
+                self.assertEqual(exit_code, 1, f"expected failure for key={key}")
+                data = json.loads(output.getvalue())
+                self.assertFalse(data["ok"])
+
+    def test_manifest_validate_execute_enabled_true_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": True},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "manifest", "validate", str(path), "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("execute_enabled" in e for e in data["errors"]))
+
+    def test_manifest_validate_community_execution_allowed_true_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": True},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "manifest", "validate", str(path), "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("community_execution_allowed" in e for e in data["errors"]))
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

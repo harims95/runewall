@@ -730,6 +730,14 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_validate_parser = maps_community_subcommands.add_parser("validate", help="Validate a local community map file.")
     maps_community_validate_parser.add_argument("path")
     maps_community_validate_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_manifest_parser = maps_community_subcommands.add_parser("manifest", help="Validate and inspect community map manifests.")
+    maps_community_manifest_subcommands = maps_community_manifest_parser.add_subparsers(dest="maps_community_manifest_command", required=True)
+    maps_community_manifest_validate_parser = maps_community_manifest_subcommands.add_parser("validate", help="Validate a local community map manifest file.")
+    maps_community_manifest_validate_parser.add_argument("path")
+    maps_community_manifest_validate_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_manifest_inspect_parser = maps_community_manifest_subcommands.add_parser("inspect", help="Inspect a local community map manifest file.")
+    maps_community_manifest_inspect_parser.add_argument("path")
+    maps_community_manifest_inspect_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1499,6 +1507,56 @@ def main(argv: list[str] | None = None) -> int:
                 for name in community_maps:
                     print(f"- {name}")
                 return 0
+            if args.maps_community_command == "manifest":
+                _not_impl: dict[str, object] = {"implemented": False, "verified": False}
+                if args.maps_community_manifest_command == "validate":
+                    report = registry.validate_manifest_file(Path(args.path))
+                    if args.json_output:
+                        print(json.dumps({
+                            "ok": report.ok,
+                            "path": report.path,
+                            "errors": report.errors,
+                            "warnings": report.warnings,
+                            "signing": _not_impl,
+                            "checksums": _not_impl,
+                        }))
+                        return 0 if report.ok else 1
+                    print("Community map manifest validation: OK" if report.ok else "Community map manifest validation: FAILED")
+                    for error in report.errors:
+                        print(f"- {error}")
+                    return 0 if report.ok else 1
+                if args.maps_community_manifest_command == "inspect":
+                    report = registry.inspect_manifest_file(Path(args.path))
+                    if args.json_output:
+                        print(json.dumps({
+                            "ok": report.ok,
+                            "path": report.path,
+                            "name": report.name,
+                            "version": report.version,
+                            "author": report.author_name,
+                            "maps_count": report.maps_count,
+                            "validation": {
+                                "ok": report.ok,
+                                "errors": report.errors,
+                                "warnings": report.warnings,
+                            },
+                            "signing": _not_impl,
+                            "checksums": _not_impl,
+                        }))
+                        return 0 if report.ok else 1
+                    print("Community map manifest inspect")
+                    print("")
+                    print(f"Path: {report.path}")
+                    print(f"Name: {report.name or '-'}")
+                    print(f"Version: {report.version or '-'}")
+                    print(f"Author: {report.author_name or '-'}")
+                    print(f"Maps: {report.maps_count}")
+                    print(f"Validation: {'OK' if report.ok else 'FAILED'}")
+                    if report.errors:
+                        print("")
+                        for error in report.errors:
+                            print(f"- {error}")
+                    return 0 if report.ok else 1
         if args.maps_command == "list":
             site_maps = registry.list_maps()
             if args.category:
