@@ -77,11 +77,11 @@ See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the manifest
 
 ## Future signed manifests
 
-Signing verification is future work.
+v0.6.1 is signing design only. Signing verification is not yet implemented.
 
-A manifest format lets community map packages declare their identity, permissions, safety posture, and file checksums — enabling signing and verification without changing the map file format.
+SHA-256 checksum verification is implemented in the current release. A future signing block will allow publishers to sign manifests for provenance and tamper detection.
 
-See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the proposed design.
+See [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the signing design, key policy, and planned commands.
 
 ## Commands
 

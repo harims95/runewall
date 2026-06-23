@@ -25,10 +25,18 @@
 
 - signed manifest design (docs/COMMUNITY_MAP_MANIFEST.md)
 
+## v0.6
+
+- community map package inspect and import
+- manifest checksum verification
+
+## v0.6.1
+
+- manifest signing design (docs/COMMUNITY_MAP_SIGNING.md)
+
 ## Future
 
-- manifest validation against declared checksums
-- signed map verification
+- local signature verification and explicit key trust store
 - stronger approval UX
 - local dashboard
 - browser automation

@@ -113,7 +113,15 @@ runewall maps community verify <path>
 
 `verify` — compare declared checksums against actual file hashes (requires checksum implementation).
 
-## 6. Out of scope
+## 6. Future signing
+
+SHA-256 checksum verification is implemented. Signature verification is not yet implemented.
+
+A future `signing` block in the manifest will allow publishers to sign the manifest fields, giving users a way to verify provenance and detect tampering.
+
+See [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the proposed signing model, key policy, and future commands.
+
+## 7. Out of scope
 
 The following are explicitly out of scope until a future release:
 
