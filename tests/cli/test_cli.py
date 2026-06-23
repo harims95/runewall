@@ -109,11 +109,11 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         rendered = output.getvalue()
         self.assertIn("Community maps status", rendered)
-        self.assertIn("* runewall maps community validate <path>", rendered)
-        self.assertIn("* runewall maps community inspect <path>", rendered)
-        self.assertIn("* runewall maps community import <path>", rendered)
-        self.assertIn("* local files only", rendered)
-        self.assertIn("* execute disabled for community maps", rendered)
+        self.assertIn("- runewall maps community validate <path>", rendered)
+        self.assertIn("- runewall maps community inspect <path>", rendered)
+        self.assertIn("- runewall maps community import <path>", rendered)
+        self.assertIn("- local files only", rendered)
+        self.assertIn("- execute disabled for community maps", rendered)
 
     def test_community_maps_status_json_returns_valid_json(self) -> None:
         output = io.StringIO()
