@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
+import shutil
 from typing import Any
 
 
@@ -45,6 +46,16 @@ class CommunityMapValidationReport:
     path: str
     errors: list[str]
     warnings: list[str]
+
+
+@dataclass(frozen=True)
+class CommunityMapImportReport:
+    ok: bool
+    source: str
+    destination: str | None
+    validated: bool
+    execute_enabled: bool
+    errors: list[str]
 
 
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
@@ -96,6 +107,9 @@ class SiteMapRegistry:
 
     def bundled_maps_path(self) -> Path:
         return Path(__file__).resolve().parent / "sites"
+
+    def community_maps_path(self, root: Path | None = None) -> Path:
+        return (root or Path.cwd()) / ".runewall" / "community-maps"
 
     def list_maps(self) -> list[SiteMap]:
         maps: list[SiteMap] = []
@@ -222,6 +236,41 @@ class SiteMapRegistry:
             errors.append("community maps cannot enable execution")
 
         return CommunityMapValidationReport(ok=not errors, path=resolved_path, errors=errors, warnings=warnings)
+
+    def import_community_map_file(self, path: Path, root: Path | None = None) -> CommunityMapImportReport:
+        report = self.validate_community_map_file(path)
+        if not report.ok:
+            return CommunityMapImportReport(
+                ok=False,
+                source=report.path,
+                destination=None,
+                validated=False,
+                execute_enabled=False,
+                errors=report.errors,
+            )
+
+        destination_dir = self.community_maps_path(root)
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination_path = destination_dir / path.name
+        shutil.copy2(path, destination_path)
+        relative_destination = Path(".runewall") / "community-maps" / path.name
+        return CommunityMapImportReport(
+            ok=True,
+            source=report.path,
+            destination=relative_destination.as_posix(),
+            validated=True,
+            execute_enabled=False,
+            errors=[],
+        )
+
+    def list_community_map_files(self, root: Path | None = None) -> list[Path]:
+        directory = self.community_maps_path(root)
+        if not directory.is_dir():
+            return []
+        return sorted(
+            [entry for entry in directory.iterdir() if entry.is_file()],
+            key=lambda entry: entry.name,
+        )
 
     def _build_site_map(self, data: dict[str, Any], *, source: str) -> SiteMap:
         schema_version = self._require_str(data, "schema_version", source=source)

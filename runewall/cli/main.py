@@ -710,6 +710,11 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_subcommands = maps_community_parser.add_subparsers(dest="maps_community_command", required=True)
     maps_community_status_parser = maps_community_subcommands.add_parser("status", help="Show community maps status.")
     maps_community_status_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_list_parser = maps_community_subcommands.add_parser("list", help="List imported local community maps.")
+    maps_community_list_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_import_parser = maps_community_subcommands.add_parser("import", help="Validate and copy a local community map file.")
+    maps_community_import_parser.add_argument("path")
+    maps_community_import_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_community_validate_parser = maps_community_subcommands.add_parser("validate", help="Validate a local community map file.")
     maps_community_validate_parser.add_argument("path")
     maps_community_validate_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -1411,6 +1416,40 @@ def main(argv: list[str] | None = None) -> int:
                 for warning in report.warnings:
                     print(f"* {warning}")
                 return 0 if report.ok else 1
+            if args.maps_community_command == "import":
+                report = registry.import_community_map_file(Path(args.path), Path.cwd())
+                if args.json_output:
+                    payload = {
+                        "ok": report.ok,
+                        "source": report.source,
+                        "validated": report.validated,
+                        "execute_enabled": report.execute_enabled,
+                    }
+                    if report.ok:
+                        payload["destination"] = report.destination
+                    else:
+                        payload["errors"] = report.errors
+                    print(json.dumps(payload))
+                    return 0 if report.ok else 1
+                print("Community map import: OK" if report.ok else "Community map import: FAILED")
+                if report.ok:
+                    print(f"Imported to: {report.destination}")
+                else:
+                    for error in report.errors:
+                        print(f"- {error}")
+                return 0 if report.ok else 1
+            if args.maps_community_command == "list":
+                community_maps = [path.name for path in registry.list_community_map_files(Path.cwd())]
+                if args.json_output:
+                    print(json.dumps({"ok": True, "community_maps": community_maps}))
+                    return 0
+                print("Community maps")
+                if not community_maps:
+                    print("No community maps imported.")
+                    return 0
+                for name in community_maps:
+                    print(f"- {name}")
+                return 0
         if args.maps_command == "list":
             site_maps = registry.list_maps()
             if args.category:

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapValidationReport, MapValidationError, SiteMapRegistry
+from runewall.maps import CommunityMapImportReport, CommunityMapValidationReport, MapValidationError, SiteMapRegistry
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -299,6 +299,26 @@ class SiteMapRegistryTests(unittest.TestCase):
         rendered = json.dumps(example_data).lower()
         for forbidden in ("token", "api_key", "secret", "password", "private_key"):
             self.assertNotIn(forbidden, rendered)
+
+    def test_import_community_map_file_copies_valid_file(self) -> None:
+        registry = SiteMapRegistry()
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = registry.import_community_map_file(example_path, Path(temp_dir))
+
+            imported_path = Path(temp_dir) / ".runewall" / "community-maps" / example_path.name
+            imported_exists = imported_path.exists()
+
+        self.assertIsInstance(report, CommunityMapImportReport)
+        self.assertTrue(report.ok)
+        self.assertTrue(imported_exists)
+        self.assertEqual(report.destination, f".runewall/community-maps/{example_path.name}")
+
+    def test_list_community_map_files_returns_empty_when_missing(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            files = registry.list_community_map_files(Path(temp_dir))
+        self.assertEqual(files, [])
 
 
 if __name__ == "__main__":
