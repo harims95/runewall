@@ -16,6 +16,7 @@ Implemented now for local stdio:
 
 - continuous `runewall mcp serve` loop
 - single-message `runewall mcp serve --once`
+- client examples documented in `docs/MCP_CLIENT_EXAMPLES.md`
 
 - `runewall.policy_test`
 - `runewall.policy_audit`

@@ -63,6 +63,18 @@ Future:
 - local dashboard later
 - browser automation later
 
+## MCP
+
+Runewall can act as a local MCP stdio server for agent safety checks.
+
+```bash
+runewall mcp status
+runewall mcp serve --once
+runewall mcp serve
+```
+
+See [docs/MCP_CLIENT_EXAMPLES.md](docs/MCP_CLIENT_EXAMPLES.md) for PowerShell smoke tests, supported methods, and supported tools.
+
 ## Quickstart
 
 ```bash
