@@ -18,6 +18,7 @@ Community maps are local files only for now.
 - validation does not execute a map
 - validation does not call external APIs
 - bundled maps continue to work as before
+- see [examples/community-maps](../examples/community-maps) for safe local examples
 
 ## Commands
 
@@ -26,4 +27,6 @@ runewall maps community status
 runewall maps community status --json
 runewall maps community validate path/to/map.json
 runewall maps community validate path/to/map.json --json
+runewall maps community validate examples/community-maps/github_create_issue.safe.json
+runewall maps community validate examples/community-maps/github_create_issue.safe.json --json
 ```

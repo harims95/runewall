@@ -1,0 +1,14 @@
+{
+  "site": "github",
+  "flow": "create_issue",
+  "action_type": "map.dry_run",
+  "description": "Safe local preview example for a GitHub issue community map.",
+  "inputs": {
+    "repo": "user/repo",
+    "title": "Bug"
+  },
+  "notes": [
+    "local-only example",
+    "dry-run first"
+  ]
+}

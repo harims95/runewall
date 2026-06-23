@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -286,6 +287,18 @@ class SiteMapRegistryTests(unittest.TestCase):
 
         self.assertFalse(report.ok)
         self.assertIn("community maps cannot enable execution", report.errors)
+
+    def test_example_community_map_validates_and_has_no_secret_keys(self) -> None:
+        registry = SiteMapRegistry()
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+
+        report = registry.validate_community_map_file(example_path)
+
+        self.assertTrue(report.ok)
+        example_data = json.loads(example_path.read_text(encoding="utf-8"))
+        rendered = json.dumps(example_data).lower()
+        for forbidden in ("token", "api_key", "secret", "password", "private_key"):
+            self.assertNotIn(forbidden, rendered)
 
 
 if __name__ == "__main__":
