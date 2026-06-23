@@ -450,6 +450,26 @@ def _community_maps_human_label(value: str) -> str:
     return value.replace("_", " ")
 
 
+def _signing_status_result() -> dict[str, object]:
+    return {
+        "ok": True,
+        "signing": {
+            "implemented": False,
+            "signature_verification": False,
+            "signature_generation": False,
+            "trusted_key_store": False,
+            "remote_key_discovery": False,
+            "checksum_verification": True,
+            "safety": {
+                "signing_implies_execution": False,
+                "community_execution_enabled": False,
+                "trust_must_be_explicit": True,
+                "private_keys_in_packages": False,
+            },
+        },
+    }
+
+
 def _maps_list_result(*, category: str | None = None, tag: str | None = None) -> dict[str, object]:
     site_maps = SiteMapRegistry().list_maps()
     if category:
@@ -746,6 +766,10 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_package_import_parser = maps_community_package_subcommands.add_parser("import", help="Import map files from a local community map package.")
     maps_community_package_import_parser.add_argument("path")
     maps_community_package_import_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_signing_parser = maps_community_subcommands.add_parser("signing", help="Show community map signing status.")
+    maps_community_signing_subcommands = maps_community_signing_parser.add_subparsers(dest="maps_community_signing_command", required=True)
+    maps_community_signing_status_parser = maps_community_signing_subcommands.add_parser("status", help="Show signing feature status.")
+    maps_community_signing_status_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1656,6 +1680,31 @@ def main(argv: list[str] | None = None) -> int:
                         for error in result.errors:
                             print(f"- {error}")
                     return 0 if result.ok else 1
+            if args.maps_community_command == "signing":
+                if args.maps_community_signing_command == "status":
+                    signing = _signing_status_result()
+                    if args.json_output:
+                        print(json.dumps(signing))
+                        return 0
+                    print("Community map signing status")
+                    print("")
+                    print("Implemented:")
+                    print("- manifest checksum verification")
+                    print("")
+                    print("Not implemented yet:")
+                    print("- signature generation")
+                    print("- signature verification")
+                    print("- trusted key store")
+                    print("- key trust")
+                    print("- key revoke")
+                    print("- remote key discovery")
+                    print("")
+                    print("Safety:")
+                    print("- signing does not imply execution")
+                    print("- community map execution remains disabled")
+                    print("- trust must be explicit and local")
+                    print("- private keys must never be stored in map packages")
+                    return 0
         if args.maps_command == "list":
             site_maps = registry.list_maps()
             if args.category:

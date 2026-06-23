@@ -57,19 +57,25 @@ The `signed_fields` list defines which manifest fields are covered by the signat
 - key rotation should be supported later
 - revoked keys should fail verification later
 
-## 6. Future commands
+## 6. Commands
 
-Not implemented. Planned for a future release:
+`signing status` is implemented. All other signing commands are future work.
 
 ```
 runewall maps community signing status
+runewall maps community signing status --json
+```
+
+`signing status` — shows which signing features are implemented and which are future work. Checksum verification is implemented; signature generation and verification are not yet implemented.
+
+Future (not yet implemented):
+
+```
 runewall maps community verify <path>
 runewall maps community keys list
 runewall maps community keys trust <key-file>
 runewall maps community keys revoke <key-id>
 ```
-
-`signing status` — show whether signing verification is enabled and what keys are trusted.
 
 `verify` — validate a package manifest and verify its signature against a locally trusted key.
 

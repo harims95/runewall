@@ -740,6 +740,29 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["imported_maps"], [])
         self.assertFalse(file_exists)
 
+    def test_community_signing_status_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "signing", "status"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map signing status", rendered)
+        self.assertIn("- manifest checksum verification", rendered)
+        self.assertIn("- signature verification", rendered)
+        self.assertIn("- signing does not imply execution", rendered)
+
+    def test_community_signing_status_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "signing", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["signing"]["implemented"])
+        self.assertTrue(data["signing"]["checksum_verification"])
+        self.assertFalse(data["signing"]["safety"]["signing_implies_execution"])
+        self.assertFalse(data["signing"]["safety"]["community_execution_enabled"])
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

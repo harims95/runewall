@@ -75,13 +75,17 @@ See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the manifest
 - Does not import the manifest itself as an executable map.
 - Does not execute anything. Imported community maps remain non-executable.
 
+## Signing status
+
+`runewall maps community signing status` shows which signing features are implemented and which are future work.
+
+See [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the signing design, key policy, and planned commands.
+
 ## Future signed manifests
 
 v0.6.1 is signing design only. Signing verification is not yet implemented.
 
-SHA-256 checksum verification is implemented in the current release. A future signing block will allow publishers to sign manifests for provenance and tamper detection.
-
-See [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the signing design, key policy, and planned commands.
+SHA-256 checksum verification is implemented. A future signing block will allow publishers to sign manifests for provenance and tamper detection.
 
 ## Commands
 
@@ -106,4 +110,6 @@ runewall maps community package inspect examples/community-maps
 runewall maps community package inspect examples/community-maps --json
 runewall maps community package import examples/community-maps
 runewall maps community package import examples/community-maps --json
+runewall maps community signing status
+runewall maps community signing status --json
 ```
