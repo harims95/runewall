@@ -284,6 +284,10 @@ def _policy_test_result(action_type: str, root: Path) -> dict[str, object]:
     }
 
 
+def _policy_audit_result(root: Path) -> dict[str, object]:
+    return _policy_audit_report(root)
+
+
 def _mcp_once_response(raw_message: str) -> dict[str, object]:
     try:
         request = json.loads(raw_message)
@@ -316,18 +320,23 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
         params = request.get("params")
         if not isinstance(params, dict):
             return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
-        if params.get("name") != "runewall.policy_test":
+        tool_name = params.get("name")
+        if tool_name == "runewall.policy_test":
+            arguments = params.get("arguments")
+            if not isinstance(arguments, dict) or not isinstance(arguments.get("action_type"), str):
+                return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: action_type"})
+            tool_result = _policy_test_result(arguments["action_type"], Path.cwd())
+        elif tool_name == "runewall.policy_audit":
+            tool_result = _policy_audit_result(Path.cwd())
+        else:
             return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
-        arguments = params.get("arguments")
-        if not isinstance(arguments, dict) or not isinstance(arguments.get("action_type"), str):
-            return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: action_type"})
         return _jsonrpc_response(
             message_id,
             result={
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps(_policy_test_result(arguments["action_type"], Path.cwd())),
+                        "text": json.dumps(tool_result),
                     }
                 ],
                 "isError": False,
@@ -662,7 +671,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
     if args.command == "policy":
         if args.policy_command == "audit":
-            audit = _policy_audit_report(Path.cwd())
+            audit = _policy_audit_result(Path.cwd())
             if audit["level"] == "INVALID":
                 if args.json_output:
                     print(json.dumps(audit))
