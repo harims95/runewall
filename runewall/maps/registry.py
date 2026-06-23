@@ -39,7 +39,16 @@ class MapValidationResult:
     error: str | None = None
 
 
+@dataclass(frozen=True)
+class CommunityMapValidationReport:
+    ok: bool
+    path: str
+    errors: list[str]
+    warnings: list[str]
+
+
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
+_COMMUNITY_SECRET_KEYS = ("token", "api_key", "secret", "password", "private_key")
 
 
 def lint_map(site_map: SiteMap) -> tuple[list[str], list[str]]:
@@ -180,6 +189,40 @@ class SiteMapRegistry:
             data = json.load(handle)
         return self._build_site_map(data, source=str(path))
 
+    def validate_community_map_file(self, path: Path) -> CommunityMapValidationReport:
+        errors: list[str] = []
+        warnings: list[str] = []
+        resolved_path = str(path)
+
+        if not path.exists():
+            return CommunityMapValidationReport(ok=False, path=resolved_path, errors=[f"file not found: {resolved_path}"], warnings=warnings)
+        if not path.is_file():
+            return CommunityMapValidationReport(ok=False, path=resolved_path, errors=[f"not a file: {resolved_path}"], warnings=warnings)
+
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except json.JSONDecodeError as error:
+            return CommunityMapValidationReport(ok=False, path=resolved_path, errors=[f"invalid JSON: {error.msg}"], warnings=warnings)
+
+        if not isinstance(data, dict):
+            return CommunityMapValidationReport(ok=False, path=resolved_path, errors=["community map must be a JSON object"], warnings=warnings)
+
+        if not isinstance(data.get("site"), str) or not str(data.get("site", "")).strip():
+            errors.append("missing required field 'site'")
+        if not isinstance(data.get("flow"), str) or not str(data.get("flow", "")).strip():
+            errors.append("missing required field 'flow'")
+        if not isinstance(data.get("action_type"), str) or not str(data.get("action_type", "")).strip():
+            errors.append("missing required field 'action_type'")
+
+        for secret_key in self._find_matching_keys(data, _COMMUNITY_SECRET_KEYS):
+            errors.append(f"secret-like field is not allowed: {secret_key}")
+
+        if self._has_enabled_execution(data):
+            errors.append("community maps cannot enable execution")
+
+        return CommunityMapValidationReport(ok=not errors, path=resolved_path, errors=errors, warnings=warnings)
+
     def _build_site_map(self, data: dict[str, Any], *, source: str) -> SiteMap:
         schema_version = self._require_str(data, "schema_version", source=source)
         site = self._require_dict(data, "site", source=source)
@@ -211,3 +254,31 @@ class SiteMapRegistry:
         if not isinstance(value, str) or not value.strip():
             raise MapValidationError(f"{source}: missing required field '{key}'")
         return value
+
+    def _find_matching_keys(self, data: Any, patterns: tuple[str, ...], *, prefix: str = "") -> list[str]:
+        matches: list[str] = []
+        if isinstance(data, dict):
+            for key, value in data.items():
+                key_text = str(key)
+                key_path = f"{prefix}.{key_text}" if prefix else key_text
+                lowered = key_text.lower()
+                if any(pattern in lowered for pattern in patterns):
+                    matches.append(key_path)
+                matches.extend(self._find_matching_keys(value, patterns, prefix=key_path))
+        elif isinstance(data, list):
+            for index, item in enumerate(data):
+                item_prefix = f"{prefix}[{index}]"
+                matches.extend(self._find_matching_keys(item, patterns, prefix=item_prefix))
+        return matches
+
+    def _has_enabled_execution(self, data: Any) -> bool:
+        if isinstance(data, dict):
+            for key, value in data.items():
+                key_text = str(key).lower()
+                if key_text in {"execute", "allow_execute", "execution_enabled"} and value is True:
+                    return True
+                if self._has_enabled_execution(value):
+                    return True
+        elif isinstance(data, list):
+            return any(self._has_enabled_execution(item) for item in data)
+        return False

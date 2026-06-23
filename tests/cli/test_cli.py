@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import redirect_stdout
 import io
+import json
 import os
 from pathlib import Path
 import sys
@@ -100,6 +101,101 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertIn("dry_run", data["sdk"]["available_functions"])
         self.assertFalse(data["sdk"]["safety"]["execute_exposed"])
+
+    def test_community_maps_status_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "status"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community maps status", rendered)
+        self.assertIn("* local files only", rendered)
+        self.assertIn("* execute disabled for community maps", rendered)
+
+    def test_community_maps_status_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["community_maps"]["safety"]["execute_enabled_for_community_maps"])
+
+    def test_community_maps_validate_valid_local_sample_exits_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text('{"site":"github","flow":"create_issue","action_type":"map.dry_run"}', encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "validate", str(map_path)])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Community map validation: OK", output.getvalue())
+
+    def test_community_maps_validate_valid_local_sample_json_returns_ok_true(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text('{"site":"github","flow":"create_issue","action_type":"map.dry_run"}', encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "validate", str(map_path), "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["errors"], [])
+
+    def test_community_maps_validate_missing_file_returns_clear_error(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "validate", "missing-community-map.json", "--json"])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("file not found" in error for error in data["errors"]))
+
+    def test_community_maps_validate_secret_like_fields_return_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for key in ("token", "api_key", "secret", "password", "private_key"):
+                map_path = Path(temp_dir) / f"{key}.json"
+                map_path.write_text(
+                    json.dumps({"site": "github", "flow": "create_issue", "action_type": "map.dry_run", key: "value"}),
+                    encoding="utf-8",
+                )
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "validate", str(map_path), "--json"])
+                self.assertEqual(exit_code, 1)
+                import json as _json
+                data = _json.loads(output.getvalue())
+                self.assertFalse(data["ok"])
+
+    def test_community_maps_validate_missing_site_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text('{"flow":"create_issue","action_type":"map.dry_run"}', encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "validate", str(map_path), "--json"])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("site" in error for error in data["errors"]))
+
+    def test_community_maps_validate_missing_flow_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text('{"site":"github","action_type":"map.dry_run"}', encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "validate", str(map_path), "--json"])
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("flow" in error for error in data["errors"]))
 
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import MapValidationError, SiteMapRegistry
+from runewall.maps import CommunityMapValidationReport, MapValidationError, SiteMapRegistry
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -242,6 +242,50 @@ class SiteMapRegistryTests(unittest.TestCase):
             self.assertIn(key, by_key)
             self.assertTrue(by_key[key].ok)
             self.assertIsNone(by_key[key].error)
+
+    def test_validate_community_map_file_passes_for_valid_local_map(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text(
+                '{"site":"github","flow":"create_issue","action_type":"map.dry_run"}',
+                encoding="utf-8",
+            )
+
+            report = registry.validate_community_map_file(map_path)
+
+        self.assertIsInstance(report, CommunityMapValidationReport)
+        self.assertTrue(report.ok)
+        self.assertEqual(report.errors, [])
+        self.assertEqual(report.warnings, [])
+
+    def test_validate_community_map_file_fails_for_secret_like_fields(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text(
+                '{"site":"github","flow":"create_issue","action_type":"map.dry_run","token":"abc"}',
+                encoding="utf-8",
+            )
+
+            report = registry.validate_community_map_file(map_path)
+
+        self.assertFalse(report.ok)
+        self.assertTrue(any("secret-like field" in error for error in report.errors))
+
+    def test_validate_community_map_file_fails_for_enabled_execution(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text(
+                '{"site":"github","flow":"create_issue","action_type":"map.dry_run","allow_execute":true}',
+                encoding="utf-8",
+            )
+
+            report = registry.validate_community_map_file(map_path)
+
+        self.assertFalse(report.ok)
+        self.assertIn("community maps cannot enable execution", report.errors)
 
 
 if __name__ == "__main__":

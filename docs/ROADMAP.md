@@ -19,7 +19,7 @@
 
 ## v0.5
 
-- community map registry
+- community map registry foundation
 
 ## Future
 

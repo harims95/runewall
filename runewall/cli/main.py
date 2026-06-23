@@ -100,6 +100,17 @@ SDK_NOT_EXPOSED_YET = (
     "rollback",
     "log",
 )
+COMMUNITY_MAPS_SUPPORTED = (
+    "validate_local_map_files",
+    "inspect_safety_posture",
+)
+COMMUNITY_MAPS_NOT_SUPPORTED_YET = (
+    "remote_registry",
+    "map_downloads",
+    "signed_map_verification",
+    "community_map_execution",
+    "automatic_installation",
+)
 MCP_SUPPORTED_METHODS = ("initialize", "tools/list", "tools/call")
 MCP_NOT_SUPPORTED_YET = (
     "runewall.execute",
@@ -409,6 +420,27 @@ def _sdk_status_result() -> dict[str, object]:
     }
 
 
+def _community_maps_status_result() -> dict[str, object]:
+    return {
+        "ok": True,
+        "community_maps": {
+            "mode": "local-files-only",
+            "supported": list(COMMUNITY_MAPS_SUPPORTED),
+            "not_supported_yet": list(COMMUNITY_MAPS_NOT_SUPPORTED_YET),
+            "safety": {
+                "dry_run_first": True,
+                "secrets_in_map_files": False,
+                "tokens_from_env_only": True,
+                "execute_enabled_for_community_maps": False,
+            },
+        },
+    }
+
+
+def _community_maps_human_label(value: str) -> str:
+    return value.replace("_", " ")
+
+
 def _maps_list_result(*, category: str | None = None, tag: str | None = None) -> dict[str, object]:
     site_maps = SiteMapRegistry().list_maps()
     if category:
@@ -674,6 +706,13 @@ def build_parser() -> argparse.ArgumentParser:
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
     maps_show_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_parser = maps_subcommands.add_parser("community", help="Inspect local community map foundation.")
+    maps_community_subcommands = maps_community_parser.add_subparsers(dest="maps_community_command", required=True)
+    maps_community_status_parser = maps_community_subcommands.add_parser("status", help="Show community maps status.")
+    maps_community_status_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_validate_parser = maps_community_subcommands.add_parser("validate", help="Validate a local community map file.")
+    maps_community_validate_parser.add_argument("path")
+    maps_community_validate_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1327,6 +1366,51 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "maps":
         registry = SiteMapRegistry()
+        if args.maps_command == "community":
+            if args.maps_community_command == "status":
+                result = _community_maps_status_result()
+                if args.json_output:
+                    print(json.dumps(result))
+                    return 0
+                print("Community maps status")
+                print("")
+                print("Mode:")
+                print("")
+                print("* local files only")
+                print("")
+                print("Supported:")
+                print("")
+                for item in result["community_maps"]["supported"]:
+                    print(f"* {_community_maps_human_label(item)}")
+                print("")
+                print("Not supported yet:")
+                print("")
+                for item in result["community_maps"]["not_supported_yet"]:
+                    print(f"* {_community_maps_human_label(item)}")
+                print("")
+                print("Safety:")
+                print("")
+                print("* dry-run first")
+                print("* no secrets in map files")
+                print("* tokens from env vars only")
+                print("* execute disabled for community maps")
+                return 0
+            if args.maps_community_command == "validate":
+                report = registry.validate_community_map_file(Path(args.path))
+                if args.json_output:
+                    print(json.dumps({
+                        "ok": report.ok,
+                        "path": report.path,
+                        "errors": report.errors,
+                        "warnings": report.warnings,
+                    }))
+                    return 0 if report.ok else 1
+                print("Community map validation: OK" if report.ok else "Community map validation: FAILED")
+                for error in report.errors:
+                    print(f"* {error}")
+                for warning in report.warnings:
+                    print(f"* {warning}")
+                return 0 if report.ok else 1
         if args.maps_command == "list":
             site_maps = registry.list_maps()
             if args.category:
