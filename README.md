@@ -84,6 +84,7 @@ print(policy_test("map.execute"))
 print(dry_run("github", "create_issue", {"repo": "user/repo", "title": "Bug"}))
 ```
 
+- See [docs/PYTHON_SDK_EXAMPLES.md](docs/PYTHON_SDK_EXAMPLES.md) for more examples.
 - `runewall sdk status`
 - `runewall sdk status --json`
 - SDK is local-only.
