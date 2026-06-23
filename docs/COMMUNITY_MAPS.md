@@ -91,6 +91,8 @@ A future local trusted key store (design in v0.6.3) will let users explicitly tr
 
 `runewall maps community keys status` shows the key store mode, storage path, and safety posture.
 
+Key revocation (`keys revoke`) is design-only. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the revoke design.
+
 ## Commands
 
 ```bash

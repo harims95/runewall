@@ -97,3 +97,58 @@ runewall maps community keys revoke <key-id>
 - hosted registry
 - automatic trust
 - community map execution
+
+## 9. Trusted key revoke design
+
+Design-only. Not implemented.
+
+### Purpose
+
+Revoking a trusted key should let a user locally mark a publisher key as no longer trusted, so future signature verification against that key fails.
+
+### Safety rule
+
+Revocation is local-only. Runewall must not depend on remote revocation lists yet. Remote revocation discovery is future work.
+
+### Proposed revoked key record behavior
+
+A revoked key record sets `"status": "revoked"` and may include optional fields:
+
+```json
+{
+  "key_id": "example-author-key",
+  "algorithm": "ed25519",
+  "public_key": "base64-public-key-placeholder",
+  "trusted_at": "2026-01-01T00:00:00Z",
+  "revoked_at": "2026-06-01T00:00:00Z",
+  "revocation_reason": "user_requested",
+  "source": "local-file",
+  "status": "revoked"
+}
+```
+
+### Future command
+
+Not implemented. Planned for a future release:
+
+```
+runewall maps community keys revoke <key-id>
+runewall maps community keys revoke <key-id> --reason "reason"
+```
+
+### Expected future behavior
+
+- revoked keys should still appear in `keys list` with `status: revoked`
+- `keys inspect` should show `status: revoked`
+- future signature verification should fail for revoked keys
+- revocation should not delete the key record by default
+- private keys must never be stored
+- revocation must not enable or disable community map execution
+
+### Out of scope
+
+- remote revocation lists
+- automatic revocation syncing
+- hosted key transparency
+- signature verification
+- community map execution

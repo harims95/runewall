@@ -55,7 +55,7 @@ The `signed_fields` list defines which manifest fields are covered by the signat
 - Runewall should not auto-trust remote keys
 - trust should be explicit and local
 - key rotation should be supported later
-- revoked keys should fail verification later
+- revoked keys should fail signature verification — a key with `status: revoked` must not pass future verification even if the signature itself is cryptographically valid
 
 The local trusted key store is design-only. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the proposed key store design, storage path, key record format, and key commands.
 
