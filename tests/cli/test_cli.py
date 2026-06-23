@@ -763,6 +763,30 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["signing"]["safety"]["signing_implies_execution"])
         self.assertFalse(data["signing"]["safety"]["community_execution_enabled"])
 
+    def test_community_keys_status_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "keys", "status"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map trusted keys status", rendered)
+        self.assertIn("- local explicit trust only", rendered)
+        self.assertIn("- .runewall/trusted-keys/", rendered)
+        self.assertIn("- key store status", rendered)
+        self.assertIn("- signing does not imply execution", rendered)
+
+    def test_community_keys_status_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "keys", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["trusted_keys"]["storage"], ".runewall/trusted-keys/")
+        self.assertTrue(data["trusted_keys"]["safety"]["trust_must_be_explicit"])
+        self.assertFalse(data["trusted_keys"]["safety"]["private_keys_stored"])
+        self.assertFalse(data["trusted_keys"]["safety"]["community_execution_enabled"])
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

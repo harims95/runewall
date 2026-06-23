@@ -470,6 +470,33 @@ def _signing_status_result() -> dict[str, object]:
     }
 
 
+def _trusted_keys_status_result() -> dict[str, object]:
+    return {
+        "ok": True,
+        "trusted_keys": {
+            "mode": "local-explicit-trust-only",
+            "storage": ".runewall/trusted-keys/",
+            "implemented": ["key_store_status"],
+            "not_implemented_yet": [
+                "key_list",
+                "key_trust",
+                "key_inspect",
+                "key_revoke",
+                "signature_verification",
+                "remote_key_discovery",
+            ],
+            "safety": {
+                "trust_must_be_explicit": True,
+                "local_only": True,
+                "automatic_remote_trust": False,
+                "private_keys_stored": False,
+                "signing_implies_execution": False,
+                "community_execution_enabled": False,
+            },
+        },
+    }
+
+
 def _maps_list_result(*, category: str | None = None, tag: str | None = None) -> dict[str, object]:
     site_maps = SiteMapRegistry().list_maps()
     if category:
@@ -770,6 +797,10 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_signing_subcommands = maps_community_signing_parser.add_subparsers(dest="maps_community_signing_command", required=True)
     maps_community_signing_status_parser = maps_community_signing_subcommands.add_parser("status", help="Show signing feature status.")
     maps_community_signing_status_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_keys_parser = maps_community_subcommands.add_parser("keys", help="Show trusted key store status.")
+    maps_community_keys_subcommands = maps_community_keys_parser.add_subparsers(dest="maps_community_keys_command", required=True)
+    maps_community_keys_status_parser = maps_community_keys_subcommands.add_parser("status", help="Show trusted key store status.")
+    maps_community_keys_status_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1704,6 +1735,35 @@ def main(argv: list[str] | None = None) -> int:
                     print("- community map execution remains disabled")
                     print("- trust must be explicit and local")
                     print("- private keys must never be stored in map packages")
+                    return 0
+            if args.maps_community_command == "keys":
+                if args.maps_community_keys_command == "status":
+                    keys = _trusted_keys_status_result()
+                    if args.json_output:
+                        print(json.dumps(keys))
+                        return 0
+                    print("Community map trusted keys status")
+                    print("")
+                    print("Mode:")
+                    print("- local explicit trust only")
+                    print("")
+                    print("Storage:")
+                    print(f"- {keys['trusted_keys']['storage']}")
+                    print("")
+                    print("Implemented:")
+                    print("- key store status")
+                    print("")
+                    print("Not implemented yet:")
+                    for item in keys["trusted_keys"]["not_implemented_yet"]:
+                        print(f"- {item.replace('_', ' ')}")
+                    print("")
+                    print("Safety:")
+                    print("- trust must be explicit")
+                    print("- trust is local only")
+                    print("- no automatic remote key trust")
+                    print("- private keys must never be stored")
+                    print("- signing does not imply execution")
+                    print("- community map execution remains disabled")
                     return 0
         if args.maps_command == "list":
             site_maps = registry.list_maps()

@@ -51,19 +51,25 @@ One JSON file per trusted key, keyed by `key_id`.
 
 `status` may be `"trusted"` or `"revoked"`. A revoked key should fail signature verification.
 
-## 6. Future commands
+## 6. Commands
 
-Not implemented. Planned for a future release:
+`keys status` is implemented. All other key commands are future work.
 
 ```
 runewall maps community keys status
+runewall maps community keys status --json
+```
+
+`keys status` — shows the key store mode, storage path, implemented features, and safety posture.
+
+Future (not yet implemented):
+
+```
 runewall maps community keys list
 runewall maps community keys trust <key-file>
 runewall maps community keys inspect <key-id>
 runewall maps community keys revoke <key-id>
 ```
-
-`keys status` — show whether a local key store exists and how many keys are trusted.
 
 `keys list` — list all locally trusted public keys with their ids and status.
 

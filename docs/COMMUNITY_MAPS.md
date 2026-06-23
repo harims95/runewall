@@ -89,6 +89,8 @@ SHA-256 checksum verification is implemented. A future signing block will allow 
 
 A future local trusted key store (design in v0.6.3) will let users explicitly trust publisher public keys. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md).
 
+`runewall maps community keys status` shows the key store mode, storage path, and safety posture.
+
 ## Commands
 
 ```bash

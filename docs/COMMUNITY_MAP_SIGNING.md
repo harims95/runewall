@@ -57,7 +57,9 @@ The `signed_fields` list defines which manifest fields are covered by the signat
 - key rotation should be supported later
 - revoked keys should fail verification later
 
-The local trusted key store is design-only. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the proposed key store design, storage path, key record format, and future key commands.
+The local trusted key store is design-only. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the proposed key store design, storage path, key record format, and key commands.
+
+`runewall maps community keys status` is implemented and shows the key store mode, safety posture, and which key operations are available.
 
 ## 6. Commands
 
