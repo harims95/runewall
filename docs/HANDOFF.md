@@ -43,7 +43,7 @@ It sits between an agent and the outside world so actions can be planned, audite
 - custom safety rules
 - `policy explain`, `policy list`, `policy test`, `policy audit`
 - policy fields in dry-run and execute JSON
-- `release check`
+- `release check`, `release json-check`, `release examples`, `release status`
 
 ## Current tags
 

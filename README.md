@@ -2,15 +2,11 @@
 
 Runewall is a local-first runtime for recording agent actions safely.
 
-It is local-first, CLI-first, and does not require a hosted backend.
+It is local-first, CLI-first, safety-first, and does not require a hosted backend.
 
-This starter implements only the initial Python package skeleton and Week 1 core:
+v0.2 is a CLI-first release candidate focused on local logging, dry-run planning, policy checks, map registry tooling, guarded real execution, and rollback.
 
-- package metadata via `pyproject.toml`
-- SQLite bootstrap for `.runewall/runewall.db`
-- core dataclasses for actions, snapshots, rules, and checkpoints
-- a minimal `runewall init` CLI
-- tests for storing and listing actions
+Real execution is guarded and disabled by default. Browser automation, a dashboard, SDK expansion, and MCP work are future roadmap items.
 
 ## Quickstart
 
@@ -31,6 +27,24 @@ runewall doctor
 ```
 
 Dry-run works without tokens. Tokens are only needed for real execution maps.
+
+## v0.2 release readiness
+
+Use this checklist before tagging or sharing a release candidate:
+
+```bash
+runewall config profile safe
+runewall release check
+runewall release json-check
+runewall release status
+python -m pytest tests -v
+```
+
+Notes:
+
+- v0.2 is CLI-first and local-first.
+- real execution is guarded and disabled by default.
+- browser automation, dashboard, SDK, and MCP work are future roadmap items.
 
 ## Command overview
 
@@ -139,14 +153,14 @@ type demo.txt
 
 ## Current working features
 
-- `runewall init`
-- `runewall log`
-- `runewall status`
-- `runewall doctor`
-- `runewall rollback --last`
-- `protect_file_create`
-- `protect_file_write`
-- `protect_file_delete`
+- local-first CLI runtime with SQLite-backed action history
+- snapshots and rollback for guarded file actions
+- approval flow with `pending`, `approve`, `reject`, and `execute`
+- universal read without browser automation
+- action maps registry with lint, search, stats, and export
+- policy tooling with explain, list, test, and audit commands
+- guarded real execution for selected maps
+- agent-readable JSON output for CLI automation
 
 ## Current working demo
 
@@ -556,6 +570,7 @@ runewall maps lint --strict
 runewall doctor
 runewall release check
 runewall release json-check
+runewall release status
 python -m pytest tests -v
 ```
 
@@ -568,6 +583,7 @@ What each step does:
 - `runewall doctor` checks local runtime health.
 - `runewall release check` combines the main local release safety checks in one command.
 - `runewall release json-check` verifies that the agent-facing JSON contract docs include the required fields and stable error codes.
+- `runewall release status` shows a compact readiness summary for the current workspace.
 - `python -m pytest tests -v` runs the test suite.
 
 Notes:
@@ -836,11 +852,8 @@ runewall read https://example.com --json
 
 If the read fails, `ok` is `false`, `error` describes the failure, and the exit code is non-zero.
 
-## Not built yet
+## Future roadmap
 
-- human approval/reject flow
-- browser/web translation
-- website maps
-- auth
-- dashboard
-- TypeScript SDK
+- browser automation when it is explicitly scheduled
+- dashboard review UX
+- broader SDK and MCP integration
