@@ -10,6 +10,8 @@ from runewall.cli.main import (
     _release_check_result,
 )
 
+__all__ = ["policy_test", "policy_audit", "release_check", "mcp_status", "dry_run"]
+
 
 def _error_result(message: str) -> dict[str, object]:
     return {"ok": False, "error": message}

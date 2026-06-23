@@ -80,6 +80,27 @@ class CliTests(unittest.TestCase):
         self.assertIn("runewall.dry_run", data["mcp"]["supported_tools"])
         self.assertFalse(data["mcp"]["safety"]["execute_exposed"])
 
+    def test_sdk_status_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["sdk", "status"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Python SDK status", rendered)
+        self.assertIn("* dry_run", rendered)
+        self.assertIn("* execute", rendered)
+
+    def test_sdk_status_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["sdk", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertIn("dry_run", data["sdk"]["available_functions"])
+        self.assertFalse(data["sdk"]["safety"]["execute_exposed"])
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

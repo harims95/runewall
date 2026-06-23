@@ -43,6 +43,7 @@ class SdkTests(unittest.TestCase):
 
     def test_sdk_has_no_execute_function(self) -> None:
         self.assertFalse(hasattr(sdk, "execute"))
+        self.assertNotIn("execute", getattr(sdk, "__all__", []))
 
 
 if __name__ == "__main__":

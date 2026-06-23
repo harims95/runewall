@@ -84,6 +84,8 @@ print(policy_test("map.execute"))
 print(dry_run("github", "create_issue", {"repo": "user/repo", "title": "Bug"}))
 ```
 
+- `runewall sdk status`
+- `runewall sdk status --json`
 - SDK is local-only.
 - `execute` is not exposed yet.
 - `dry_run` does not call external APIs.

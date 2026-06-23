@@ -86,6 +86,20 @@ MCP_LATER_TOOLS = (
     "runewall.rollback",
     "runewall.log",
 )
+SDK_AVAILABLE_FUNCTIONS = (
+    "policy_test",
+    "policy_audit",
+    "release_check",
+    "mcp_status",
+    "dry_run",
+)
+SDK_NOT_EXPOSED_YET = (
+    "execute",
+    "approve",
+    "reject",
+    "rollback",
+    "log",
+)
 MCP_SUPPORTED_METHODS = ("initialize", "tools/list", "tools/call")
 MCP_NOT_SUPPORTED_YET = (
     "runewall.execute",
@@ -377,6 +391,24 @@ def _mcp_status_result() -> dict[str, object]:
     }
 
 
+def _sdk_status_result() -> dict[str, object]:
+    return {
+        "ok": True,
+        "sdk": {
+            "status": "preview",
+            "available_functions": list(SDK_AVAILABLE_FUNCTIONS),
+            "not_exposed_yet": list(SDK_NOT_EXPOSED_YET),
+            "safety": {
+                "local_only": True,
+                "dry_run_external_api_calls": False,
+                "token_storage": False,
+                "token_printing": False,
+                "execute_exposed": False,
+            },
+        },
+    }
+
+
 def _maps_list_result(*, category: str | None = None, tag: str | None = None) -> dict[str, object]:
     site_maps = SiteMapRegistry().list_maps()
     if category:
@@ -572,6 +604,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  log      show action log\n"
             "  act      dry-run or execute mapped actions\n"
             "  maps     inspect bundled action maps\n"
+            "  sdk      inspect Python SDK preview surface\n"
             "  config   inspect and manage local config\n"
             "  mcp      inspect planned MCP tool surface\n"
             "  policy   explain, test, list, and audit safety policies\n"
@@ -641,6 +674,14 @@ def build_parser() -> argparse.ArgumentParser:
     maps_show_parser = maps_subcommands.add_parser("show", help="Show a bundled site map.")
     maps_show_parser.add_argument("site")
     maps_show_parser.add_argument("--json", action="store_true", dest="json_output")
+    sdk_parser = subcommands.add_parser(
+        "sdk",
+        help="Inspect Python SDK preview surface.",
+        description="Inspect the local Runewall Python SDK preview surface.",
+    )
+    sdk_subcommands = sdk_parser.add_subparsers(dest="sdk_command", required=True)
+    sdk_status_parser = sdk_subcommands.add_parser("status", help="Show Python SDK preview status.")
+    sdk_status_parser.add_argument("--json", action="store_true", dest="json_output")
     config_parser = subcommands.add_parser(
         "config",
         help="Inspect and manage local config.",
@@ -841,6 +882,32 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(_mcp_once_response(sys.stdin.read())))
                 return 0
             _mcp_serve_stream(sys.stdin, sys.stdout)
+            return 0
+    if args.command == "sdk":
+        if args.sdk_command == "status":
+            result = _sdk_status_result()
+            if args.json_output:
+                print(json.dumps(result))
+                return 0
+            print("Python SDK status")
+            print("")
+            print("Available functions:")
+            print("")
+            for function_name in result["sdk"]["available_functions"]:
+                print(f"* {function_name}")
+            print("")
+            print("Not exposed yet:")
+            print("")
+            for function_name in result["sdk"]["not_exposed_yet"]:
+                print(f"* {function_name}")
+            print("")
+            print("Safety:")
+            print("")
+            print("* local-only")
+            print("* dry_run does not call external APIs")
+            print("* no token storage")
+            print("* no token printing")
+            print("* execute not exposed")
             return 0
     if args.command == "config":
         if args.config_command == "path":
