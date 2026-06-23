@@ -348,6 +348,28 @@ def _doctor_result(root: Path) -> dict[str, object]:
     }
 
 
+def _maps_list_result(*, category: str | None = None, tag: str | None = None) -> dict[str, object]:
+    site_maps = SiteMapRegistry().list_maps()
+    if category:
+        site_maps = [m for m in site_maps if m.category == category]
+    if tag:
+        site_maps = [m for m in site_maps if tag in m.tags]
+    return {
+        "maps": [
+            {
+                "key": site_map.raw.get("_filename", "").removesuffix(".json"),
+                "site_name": site_map.site_name,
+                "base_url": site_map.base_url,
+                "category": site_map.category,
+                "tags": site_map.tags,
+                "flow_count": len(site_map.flows),
+                "flows": list(site_map.flows.keys()),
+            }
+            for site_map in site_maps
+        ]
+    }
+
+
 def _mcp_once_response(raw_message: str) -> dict[str, object]:
     try:
         request = json.loads(raw_message)
@@ -392,6 +414,8 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
             tool_result = _release_check_result(Path.cwd())
         elif tool_name == "runewall.doctor":
             tool_result = _doctor_result(Path.cwd())
+        elif tool_name == "runewall.maps_list":
+            tool_result = _maps_list_result()
         else:
             return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
         return _jsonrpc_response(
@@ -1079,20 +1103,7 @@ def main(argv: list[str] | None = None) -> int:
                 site_maps = [m for m in site_maps if args.tag in m.tags]
 
             if args.json_output:
-                print(json.dumps({
-                    "maps": [
-                        {
-                            "key": site_map.raw.get("_filename", "").removesuffix(".json"),
-                            "site_name": site_map.site_name,
-                            "base_url": site_map.base_url,
-                            "category": site_map.category,
-                            "tags": site_map.tags,
-                            "flow_count": len(site_map.flows),
-                            "flows": list(site_map.flows.keys()),
-                        }
-                        for site_map in site_maps
-                    ]
-                }))
+                print(json.dumps(_maps_list_result(category=args.category, tag=args.tag)))
                 return 0
 
             if not site_maps:
