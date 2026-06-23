@@ -40,6 +40,13 @@ Normal validation error:
 {"ok": False, "error": "site is required", "error_code": "missing_site"}
 ```
 
+## Dry-run parity
+
+- SDK `dry_run` is intended to match CLI dry-run semantics.
+- Both are local preview paths.
+- Neither should call external APIs.
+- SDK is easier for agent scripts, and the CLI is easier for terminal workflows.
+
 ## Example: policy test
 
 ```python
