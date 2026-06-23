@@ -1,12 +1,67 @@
 # Runewall
 
-Runewall is a local-first runtime for recording agent actions safely.
+Runewall is a local-first safety/runtime layer for AI agents before they take real-world actions.
 
-It is local-first, CLI-first, safety-first, and does not require a hosted backend.
+## Problem
 
-v0.2 is a CLI-first release candidate focused on local logging, dry-run planning, policy checks, map registry tooling, guarded real execution, and rollback.
+Agents are moving from answering to acting. Before an agent touches files, APIs, or tools, developers need a local layer that can preview the action, explain the policy decision, block risky behavior, log what happened, and rollback where possible.
 
-Real execution is guarded and disabled by default. Browser automation, a dashboard, SDK expansion, and MCP work are future roadmap items.
+## Simple architecture
+
+`Agent -> Runewall -> policy check -> dry-run -> review/execute/block -> log/audit`
+
+## 60-second demo
+
+```bash
+runewall config profile safe
+runewall policy audit
+runewall act github create_issue --dry-run --json --input repo=user/repo --input title="Bug"
+runewall policy test map.execute --json
+runewall release check
+```
+
+What each command means:
+
+- `runewall config profile safe` resets guarded local config.
+- `runewall policy audit` checks for risky local settings.
+- `runewall act github create_issue --dry-run --json ...` previews GitHub issue creation without external API calls.
+- `runewall policy test map.execute --json` explains the current execution decision for mapped actions.
+- `runewall release check` verifies local release readiness.
+
+## What works now
+
+- local SQLite action log
+- snapshots and rollback
+- review and approval flow
+- action maps
+- `maps lint`, `maps search`, `maps stats`, and `maps export`
+- `config validate`, `config reset`, and `config profile`
+- custom auth token environment variable names
+- custom safety rules
+- `policy explain`, `policy list`, `policy test`, and `policy audit`
+- policy fields in JSON output
+- `doctor` and release checks
+- guarded real execution for Cloudflare, GitHub, Vercel, Netlify, and Supabase
+
+## Safety defaults
+
+- real execution is disabled by default
+- dry-run never calls external APIs
+- tokens are read only from environment variables
+- tokens are never printed, stored, or logged
+- policy block prevents execution
+
+## Roadmap
+
+Future:
+
+- MCP server
+- Python SDK
+- TypeScript SDK later
+- community map registry
+- stronger approval UX
+- local dashboard later
+- browser automation later
 
 ## Quickstart
 
