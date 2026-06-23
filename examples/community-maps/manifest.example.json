@@ -1,0 +1,31 @@
+{
+  "manifest_version": "0.1",
+  "name": "github-safe-issue-map",
+  "version": "0.1.0",
+  "description": "Safe GitHub issue dry-run map.",
+  "author": {
+    "name": "example-author",
+    "url": "https://example.com"
+  },
+  "maps": [
+    {
+      "path": "github_create_issue.safe.json",
+      "site": "github",
+      "flow": "create_issue",
+      "action_type": "map.dry_run"
+    }
+  ],
+  "permissions": {
+    "external_api_calls": false,
+    "requires_tokens": false,
+    "execute_enabled": false
+  },
+  "safety": {
+    "secrets_in_files": false,
+    "dry_run_first": true,
+    "community_execution_allowed": false
+  },
+  "checksums": {
+    "github_create_issue.safe.json": "sha256-placeholder"
+  }
+}

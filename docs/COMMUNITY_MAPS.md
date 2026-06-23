@@ -47,6 +47,14 @@ v0.5 community maps are local-only and non-executable.
 4. List imported maps:
    `runewall maps community list`
 
+## Future signed manifests
+
+Design-only in v0.5.1. Not implemented yet.
+
+A future manifest format will let community map packages declare their identity, permissions, safety posture, and file checksums — enabling signing and verification without changing the map file format.
+
+See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the proposed design.
+
 ## Commands
 
 ```bash

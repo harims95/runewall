@@ -21,8 +21,14 @@
 
 - community map registry foundation
 
+## v0.5.1
+
+- signed manifest design (docs/COMMUNITY_MAP_MANIFEST.md)
+
 ## Future
 
+- manifest validation against declared checksums
+- signed map verification
 - stronger approval UX
 - local dashboard
 - browser automation
