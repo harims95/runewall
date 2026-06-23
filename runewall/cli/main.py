@@ -271,6 +271,19 @@ def _jsonrpc_response(message_id: object, *, result: dict[str, object] | None = 
     return response
 
 
+def _policy_test_result(action_type: str, root: Path) -> dict[str, object]:
+    explanation = explain_policy(action_type, load_config(root))
+    decision = decision_for_policy(explanation.policy)
+    return {
+        "ok": True,
+        "action_type": explanation.action_type,
+        "policy": explanation.policy_name,
+        "decision": decision,
+        "source": explanation.source,
+        "reason": explanation.reason,
+    }
+
+
 def _mcp_once_response(raw_message: str) -> dict[str, object]:
     try:
         request = json.loads(raw_message)
@@ -299,6 +312,27 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
         )
     if method == "tools/list":
         return _jsonrpc_response(message_id, result={"tools": list(MCP_TOOL_DEFINITIONS)})
+    if method == "tools/call":
+        params = request.get("params")
+        if not isinstance(params, dict):
+            return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
+        if params.get("name") != "runewall.policy_test":
+            return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
+        arguments = params.get("arguments")
+        if not isinstance(arguments, dict) or not isinstance(arguments.get("action_type"), str):
+            return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: action_type"})
+        return _jsonrpc_response(
+            message_id,
+            result={
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(_policy_test_result(arguments["action_type"], Path.cwd())),
+                    }
+                ],
+                "isError": False,
+            },
+        )
     return _jsonrpc_response(message_id, error={"code": -32601, "message": "Method not found"})
 
 
@@ -687,14 +721,7 @@ def main(argv: list[str] | None = None) -> int:
             explanation = explain_policy(args.action_type, load_config(Path.cwd()))
             decision = decision_for_policy(explanation.policy)
             if args.json_output:
-                print(json.dumps({
-                    "ok": True,
-                    "action_type": explanation.action_type,
-                    "policy": explanation.policy_name,
-                    "decision": decision,
-                    "source": explanation.source,
-                    "reason": explanation.reason,
-                }))
+                print(json.dumps(_policy_test_result(args.action_type, Path.cwd())))
                 return 0
             print(f"Action: {explanation.action_type}")
             print(f"Policy: {explanation.policy_name}")
