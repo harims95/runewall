@@ -113,6 +113,16 @@ class PackageImportReport:
     execute_enabled: bool
 
 
+@dataclass(frozen=True)
+class TrustedKeyRecord:
+    key_id: str
+    algorithm: str
+    public_key: str
+    trusted_at: str
+    source: str
+    status: str
+
+
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
 _COMMUNITY_SECRET_KEYS = ("token", "api_key", "secret", "password", "private_key")
 _MANIFEST_REQUIRED_STR = ("manifest_version", "name", "version", "description")
@@ -168,6 +178,41 @@ class SiteMapRegistry:
 
     def community_maps_path(self, root: Path | None = None) -> Path:
         return (root or Path.cwd()) / ".runewall" / "community-maps"
+
+    def trusted_keys_path(self, root: Path | None = None) -> Path:
+        return (root or Path.cwd()) / ".runewall" / "trusted-keys"
+
+    def list_trusted_keys(self, root: Path | None = None) -> tuple[list[TrustedKeyRecord], list[str]]:
+        directory = self.trusted_keys_path(root)
+        if not directory.is_dir():
+            return [], []
+        records: list[TrustedKeyRecord] = []
+        warnings: list[str] = []
+        for entry in sorted(directory.iterdir(), key=lambda e: e.name):
+            if not entry.is_file() or not entry.name.endswith(".json"):
+                continue
+            try:
+                with entry.open("r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+            except (OSError, json.JSONDecodeError):
+                warnings.append(f"Invalid key record: {entry.name}")
+                continue
+            if not isinstance(data, dict):
+                warnings.append(f"Invalid key record: {entry.name}")
+                continue
+            required = ("key_id", "algorithm", "public_key", "trusted_at", "source", "status")
+            if not all(isinstance(data.get(f), str) for f in required):
+                warnings.append(f"Invalid key record: {entry.name}")
+                continue
+            records.append(TrustedKeyRecord(
+                key_id=data["key_id"],
+                algorithm=data["algorithm"],
+                public_key=data["public_key"],
+                trusted_at=data["trusted_at"],
+                source=data["source"],
+                status=data["status"],
+            ))
+        return records, warnings
 
     def list_maps(self) -> list[SiteMap]:
         maps: list[SiteMap] = []

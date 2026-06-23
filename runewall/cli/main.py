@@ -801,6 +801,8 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_keys_subcommands = maps_community_keys_parser.add_subparsers(dest="maps_community_keys_command", required=True)
     maps_community_keys_status_parser = maps_community_keys_subcommands.add_parser("status", help="Show trusted key store status.")
     maps_community_keys_status_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_keys_list_parser = maps_community_keys_subcommands.add_parser("list", help="List locally trusted public keys.")
+    maps_community_keys_list_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1764,6 +1766,43 @@ def main(argv: list[str] | None = None) -> int:
                     print("- private keys must never be stored")
                     print("- signing does not imply execution")
                     print("- community map execution remains disabled")
+                    return 0
+                if args.maps_community_keys_command == "list":
+                    records, warnings = registry.list_trusted_keys(Path.cwd())
+                    if args.json_output:
+                        payload: dict[str, object] = {
+                            "ok": True,
+                            "trusted_keys": [
+                                {
+                                    "key_id": r.key_id,
+                                    "algorithm": r.algorithm,
+                                    "trusted_at": r.trusted_at,
+                                    "source": r.source,
+                                    "status": r.status,
+                                }
+                                for r in records
+                            ],
+                        }
+                        if warnings:
+                            payload["warnings"] = warnings
+                        print(json.dumps(payload))
+                        return 0
+                    print("Community map trusted keys")
+                    if not records:
+                        print("")
+                        print("No trusted keys found.")
+                    else:
+                        for r in records:
+                            print("")
+                            print(f"- {r.key_id}")
+                            print(f"  Algorithm: {r.algorithm}")
+                            print(f"  Status: {r.status}")
+                            print(f"  Source: {r.source}")
+                    if warnings:
+                        print("")
+                        print("Warnings:")
+                        for w in warnings:
+                            print(f"- {w}")
                     return 0
         if args.maps_command == "list":
             site_maps = registry.list_maps()

@@ -787,6 +787,112 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["trusted_keys"]["safety"]["private_keys_stored"])
         self.assertFalse(data["trusted_keys"]["safety"]["community_execution_enabled"])
 
+    def test_keys_list_exits_zero_when_folder_missing(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "list"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("No trusted keys found.", output.getvalue())
+
+    def test_keys_list_json_exits_zero_and_returns_empty(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "list", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["trusted_keys"], [])
+
+    def test_keys_list_shows_key_record(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "example.json").write_text(
+                json.dumps({
+                    "key_id": "example-author-key",
+                    "algorithm": "ed25519",
+                    "public_key": "base64-placeholder",
+                    "trusted_at": "2026-01-01T00:00:00Z",
+                    "source": "local-file",
+                    "status": "trusted",
+                }),
+                encoding="utf-8",
+            )
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "list"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("example-author-key", rendered)
+        self.assertIn("Algorithm: ed25519", rendered)
+        self.assertNotIn("base64-placeholder", rendered)
+
+    def test_keys_list_json_includes_key_id_and_omits_public_key(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "example.json").write_text(
+                json.dumps({
+                    "key_id": "example-author-key",
+                    "algorithm": "ed25519",
+                    "public_key": "base64-placeholder",
+                    "trusted_at": "2026-01-01T00:00:00Z",
+                    "source": "local-file",
+                    "status": "trusted",
+                }),
+                encoding="utf-8",
+            )
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "list", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertEqual(len(data["trusted_keys"]), 1)
+        self.assertEqual(data["trusted_keys"][0]["key_id"], "example-author-key")
+        self.assertNotIn("public_key", data["trusted_keys"][0])
+
+    def test_keys_list_invalid_record_creates_warning(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "bad.json").write_text("not-valid-json", encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "list", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["trusted_keys"], [])
+        self.assertIn("warnings", data)
+        self.assertTrue(any("bad.json" in w for w in data["warnings"]))
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

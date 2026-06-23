@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageImportReport, PackageInspectReport, SiteMapRegistry
+from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageImportReport, PackageInspectReport, SiteMapRegistry, TrustedKeyRecord
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -641,6 +641,47 @@ class SiteMapRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             result = registry.import_package_directory(example_dir, Path(temp_dir))
         self.assertFalse(result.execute_enabled)
+
+    def test_list_trusted_keys_returns_empty_when_folder_missing(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            records, warnings = registry.list_trusted_keys(Path(temp_dir))
+        self.assertEqual(records, [])
+        self.assertEqual(warnings, [])
+
+    def test_list_trusted_keys_returns_key_record(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "example.json").write_text(
+                json.dumps({
+                    "key_id": "example-author-key",
+                    "algorithm": "ed25519",
+                    "public_key": "base64-placeholder",
+                    "trusted_at": "2026-01-01T00:00:00Z",
+                    "source": "local-file",
+                    "status": "trusted",
+                }),
+                encoding="utf-8",
+            )
+            records, warnings = registry.list_trusted_keys(Path(temp_dir))
+        self.assertEqual(len(records), 1)
+        self.assertIsInstance(records[0], TrustedKeyRecord)
+        self.assertEqual(records[0].key_id, "example-author-key")
+        self.assertEqual(records[0].algorithm, "ed25519")
+        self.assertEqual(records[0].status, "trusted")
+        self.assertEqual(warnings, [])
+
+    def test_list_trusted_keys_warns_for_invalid_record(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "bad.json").write_text("not-json", encoding="utf-8")
+            records, warnings = registry.list_trusted_keys(Path(temp_dir))
+        self.assertEqual(records, [])
+        self.assertTrue(any("bad.json" in w for w in warnings))
 
 
 if __name__ == "__main__":
