@@ -370,6 +370,43 @@ def _maps_list_result(*, category: str | None = None, tag: str | None = None) ->
     }
 
 
+def _maps_show_result(site: str, *, flow: str | None = None) -> dict[str, object] | None:
+    site_map = SiteMapRegistry().load_site(site)
+    if site_map is None:
+        return None
+
+    flows_json = []
+    flow_items = [(flow, site_map.flows.get(flow))] if flow is not None else list(site_map.flows.items())
+    for flow_name, flow_data in flow_items:
+        if flow_data is None:
+            return None
+        required_inputs = [
+            input_name
+            for input_name, input_data in flow_data.get("inputs", {}).items()
+            if input_data.get("required") is True
+        ]
+        flows_json.append({
+            "name": flow_name,
+            "description": flow_data.get("description", ""),
+            "risk_level": flow_data.get("risk_level", ""),
+            "reversible": flow_data.get("reversible", False),
+            "requires_auth": flow_data.get("requires_auth", False),
+            "required_inputs": required_inputs,
+            "api_path": flow_data.get("api_path"),
+        })
+
+    return {
+        "key": site_map.raw.get("_filename", "").removesuffix(".json"),
+        "site_name": site_map.site_name,
+        "base_url": site_map.base_url,
+        "map_version": site_map.map_version,
+        "schema_version": site_map.schema_version,
+        "category": site_map.category,
+        "tags": site_map.tags,
+        "flows": flows_json,
+    }
+
+
 def _mcp_once_response(raw_message: str) -> dict[str, object]:
     try:
         request = json.loads(raw_message)
@@ -416,6 +453,15 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
             tool_result = _doctor_result(Path.cwd())
         elif tool_name == "runewall.maps_list":
             tool_result = _maps_list_result()
+        elif tool_name == "runewall.maps_show":
+            arguments = params.get("arguments")
+            if not isinstance(arguments, dict) or not isinstance(arguments.get("site"), str):
+                return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: site"})
+            if not isinstance(arguments.get("flow"), str):
+                return _jsonrpc_response(message_id, error={"code": -32602, "message": "Missing required argument: flow"})
+            tool_result = _maps_show_result(arguments["site"], flow=arguments["flow"])
+            if tool_result is None:
+                return _jsonrpc_response(message_id, error={"code": -32602, "message": "Map not found"})
         else:
             return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
         return _jsonrpc_response(
@@ -1303,32 +1349,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
 
             if args.json_output:
-                flows_json = []
-                for flow_name, flow_data in site_map.flows.items():
-                    required_inputs = [
-                        input_name
-                        for input_name, input_data in flow_data.get("inputs", {}).items()
-                        if input_data.get("required") is True
-                    ]
-                    flows_json.append({
-                        "name": flow_name,
-                        "description": flow_data.get("description", ""),
-                        "risk_level": flow_data.get("risk_level", ""),
-                        "reversible": flow_data.get("reversible", False),
-                        "requires_auth": flow_data.get("requires_auth", False),
-                        "required_inputs": required_inputs,
-                        "api_path": flow_data.get("api_path"),
-                    })
-                print(json.dumps({
-                    "key": site_map.raw.get("_filename", "").removesuffix(".json"),
-                    "site_name": site_map.site_name,
-                    "base_url": site_map.base_url,
-                    "map_version": site_map.map_version,
-                    "schema_version": site_map.schema_version,
-                    "category": site_map.category,
-                    "tags": site_map.tags,
-                    "flows": flows_json,
-                }))
+                print(json.dumps(_maps_show_result(args.site)))
                 return 0
 
             print(f"Site name: {site_map.site_name}")

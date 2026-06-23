@@ -181,11 +181,11 @@ class CliTests(unittest.TestCase):
         self.assertTrue(any(site["key"] == "github" for site in maps_list["maps"]))
         self.assertFalse(data["result"]["isError"])
 
-    def test_mcp_serve_once_tools_call_missing_action_type_returns_invalid_params(self) -> None:
+    def test_mcp_serve_once_handles_tools_call_maps_show(self) -> None:
         output = io.StringIO()
         request = (
             '{"jsonrpc":"2.0","id":8,"method":"tools/call",'
-            '"params":{"name":"runewall.policy_test","arguments":{}}}'
+            '"params":{"name":"runewall.maps_show","arguments":{"site":"github","flow":"create_issue"}}}'
         )
         with patch("sys.stdin", io.StringIO(request)):
             with redirect_stdout(output):
@@ -193,15 +193,19 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         import json as _json
         data = _json.loads(output.getvalue())
+        self.assertEqual(data["jsonrpc"], "2.0")
         self.assertEqual(data["id"], 8)
-        self.assertEqual(data["error"]["code"], -32602)
-        self.assertEqual(data["error"]["message"], "Missing required argument: action_type")
+        self.assertEqual(data["result"]["content"][0]["type"], "text")
+        maps_show = _json.loads(data["result"]["content"][0]["text"])
+        self.assertEqual(maps_show["key"], "github")
+        self.assertEqual(maps_show["flows"][0]["name"], "create_issue")
+        self.assertFalse(data["result"]["isError"])
 
-    def test_mcp_serve_once_tools_call_unknown_tool_returns_invalid_params(self) -> None:
+    def test_mcp_serve_once_tools_call_maps_show_missing_site_returns_invalid_params(self) -> None:
         output = io.StringIO()
         request = (
             '{"jsonrpc":"2.0","id":9,"method":"tools/call",'
-            '"params":{"name":"runewall.unknown","arguments":{"action_type":"map.execute"}}}'
+            '"params":{"name":"runewall.maps_show","arguments":{"flow":"create_issue"}}}'
         )
         with patch("sys.stdin", io.StringIO(request)):
             with redirect_stdout(output):
@@ -211,17 +215,81 @@ class CliTests(unittest.TestCase):
         data = _json.loads(output.getvalue())
         self.assertEqual(data["id"], 9)
         self.assertEqual(data["error"]["code"], -32602)
-        self.assertEqual(data["error"]["message"], "Unknown tool")
+        self.assertEqual(data["error"]["message"], "Missing required argument: site")
 
-    def test_mcp_serve_once_unknown_method_returns_method_not_found(self) -> None:
+    def test_mcp_serve_once_tools_call_maps_show_missing_flow_returns_invalid_params(self) -> None:
         output = io.StringIO()
-        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":10,"method":"unknown","params":{}}')):
+        request = (
+            '{"jsonrpc":"2.0","id":10,"method":"tools/call",'
+            '"params":{"name":"runewall.maps_show","arguments":{"site":"github"}}}'
+        )
+        with patch("sys.stdin", io.StringIO(request)):
             with redirect_stdout(output):
                 exit_code = main(["mcp", "serve", "--once"])
         self.assertEqual(exit_code, 0)
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["id"], 10)
+        self.assertEqual(data["error"]["code"], -32602)
+        self.assertEqual(data["error"]["message"], "Missing required argument: flow")
+
+    def test_mcp_serve_once_tools_call_maps_show_unknown_map_returns_invalid_params(self) -> None:
+        output = io.StringIO()
+        request = (
+            '{"jsonrpc":"2.0","id":11,"method":"tools/call",'
+            '"params":{"name":"runewall.maps_show","arguments":{"site":"unknown","flow":"missing"}}}'
+        )
+        with patch("sys.stdin", io.StringIO(request)):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["id"], 11)
+        self.assertEqual(data["error"]["code"], -32602)
+        self.assertEqual(data["error"]["message"], "Map not found")
+
+    def test_mcp_serve_once_tools_call_missing_action_type_returns_invalid_params(self) -> None:
+        output = io.StringIO()
+        request = (
+            '{"jsonrpc":"2.0","id":12,"method":"tools/call",'
+            '"params":{"name":"runewall.policy_test","arguments":{}}}'
+        )
+        with patch("sys.stdin", io.StringIO(request)):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["id"], 12)
+        self.assertEqual(data["error"]["code"], -32602)
+        self.assertEqual(data["error"]["message"], "Missing required argument: action_type")
+
+    def test_mcp_serve_once_tools_call_unknown_tool_returns_invalid_params(self) -> None:
+        output = io.StringIO()
+        request = (
+            '{"jsonrpc":"2.0","id":13,"method":"tools/call",'
+            '"params":{"name":"runewall.unknown","arguments":{"action_type":"map.execute"}}}'
+        )
+        with patch("sys.stdin", io.StringIO(request)):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["id"], 13)
+        self.assertEqual(data["error"]["code"], -32602)
+        self.assertEqual(data["error"]["message"], "Unknown tool")
+
+    def test_mcp_serve_once_unknown_method_returns_method_not_found(self) -> None:
+        output = io.StringIO()
+        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":14,"method":"unknown","params":{}}')):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["id"], 14)
         self.assertEqual(data["error"]["code"], -32601)
         self.assertEqual(data["error"]["message"], "Method not found")
 
@@ -238,13 +306,13 @@ class CliTests(unittest.TestCase):
 
     def test_mcp_serve_once_missing_method_returns_invalid_request(self) -> None:
         output = io.StringIO()
-        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":11,"params":{}}')):
+        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":15,"params":{}}')):
             with redirect_stdout(output):
                 exit_code = main(["mcp", "serve", "--once"])
         self.assertEqual(exit_code, 0)
         import json as _json
         data = _json.loads(output.getvalue())
-        self.assertEqual(data["id"], 11)
+        self.assertEqual(data["id"], 15)
         self.assertEqual(data["error"]["code"], -32600)
 
     def test_policy_help_exits_zero_and_mentions_audit(self) -> None:
