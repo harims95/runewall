@@ -80,6 +80,48 @@ class CliTests(unittest.TestCase):
         self.assertIn("runewall.dry_run", data["mcp"]["supported_tools"])
         self.assertFalse(data["mcp"]["safety"]["execute_exposed"])
 
+    def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
+        output = io.StringIO()
+        request_stream = (
+            '{"jsonrpc":"2.0","id":101,"method":"initialize","params":{}}\n'
+            '\n'
+            '{"jsonrpc":"2.0","id":102,"method":"tools/list","params":{}}\n'
+        )
+        with patch("sys.stdin", io.StringIO(request_stream)):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 2)
+        first = _json.loads(lines[0])
+        second = _json.loads(lines[1])
+        self.assertEqual(first["id"], 101)
+        self.assertEqual(first["result"]["serverInfo"]["name"], "runewall")
+        self.assertEqual(second["id"], 102)
+        names = [tool["name"] for tool in second["result"]["tools"]]
+        self.assertIn("runewall.dry_run", names)
+
+    def test_mcp_serve_invalid_json_returns_parse_error_and_continues(self) -> None:
+        output = io.StringIO()
+        request_stream = (
+            '{invalid json\n'
+            '{"jsonrpc":"2.0","id":103,"method":"tools/list","params":{}}\n'
+        )
+        with patch("sys.stdin", io.StringIO(request_stream)):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        lines = output.getvalue().splitlines()
+        self.assertEqual(len(lines), 2)
+        first = _json.loads(lines[0])
+        second = _json.loads(lines[1])
+        self.assertIsNone(first["id"])
+        self.assertEqual(first["error"]["code"], -32700)
+        self.assertEqual(second["id"], 103)
+        self.assertIn("tools", second["result"])
+
     def test_mcp_serve_once_handles_initialize(self) -> None:
         output = io.StringIO()
         with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}')):

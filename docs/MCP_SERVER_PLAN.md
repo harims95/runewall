@@ -12,7 +12,10 @@ Agents and tools need a standard way to route actions through Runewall:
 
 ## Initial MCP tools to expose
 
-Implemented now for local `stdio --once`:
+Implemented now for local stdio:
+
+- continuous `runewall mcp serve` loop
+- single-message `runewall mcp serve --once`
 
 - `runewall.policy_test`
 - `runewall.policy_audit`
@@ -47,6 +50,11 @@ Implemented now for local `stdio --once`:
 ```bash
 runewall mcp serve
 ```
+
+Current local modes:
+
+- `runewall mcp serve`
+- `runewall mcp serve --once`
 
 ## Out of scope for v0.3
 

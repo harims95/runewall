@@ -88,7 +88,6 @@ MCP_LATER_TOOLS = (
 )
 MCP_SUPPORTED_METHODS = ("initialize", "tools/list", "tools/call")
 MCP_NOT_SUPPORTED_YET = (
-    "continuous_serve_loop",
     "runewall.execute",
     "runewall.approve",
     "runewall.reject",
@@ -363,7 +362,7 @@ def _mcp_status_result() -> dict[str, object]:
     return {
         "ok": True,
         "mcp": {
-            "mode": "stdio-once",
+            "mode": "stdio",
             "methods": list(MCP_SUPPORTED_METHODS),
             "supported_tools": list(MCP_INITIAL_TOOLS),
             "not_supported_yet": list(MCP_NOT_SUPPORTED_YET),
@@ -551,6 +550,15 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
             },
         )
     return _jsonrpc_response(message_id, error={"code": -32601, "message": "Method not found"})
+
+
+def _mcp_serve_stream(input_stream: object, output_stream: object) -> None:
+    for raw_line in input_stream:
+        line = raw_line.strip()
+        if not line:
+            continue
+        output_stream.write(json.dumps(_mcp_once_response(line), separators=(",", ":")))
+        output_stream.write("\n")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -802,6 +810,7 @@ def main(argv: list[str] | None = None) -> int:
             print("")
             print("Mode:")
             print("")
+            print("* continuous stdio serve supported")
             print("* stdio --once supported")
             print("")
             print("Supported methods:")
@@ -828,10 +837,10 @@ def main(argv: list[str] | None = None) -> int:
             print("* execute not exposed through MCP")
             return 0
         if args.mcp_command == "serve":
-            if not args.once:
-                print("Use `runewall mcp serve --once` for the local MCP stdio skeleton.")
-                return 1
-            print(json.dumps(_mcp_once_response(sys.stdin.read())))
+            if args.once:
+                print(json.dumps(_mcp_once_response(sys.stdin.read())))
+                return 0
+            _mcp_serve_stream(sys.stdin, sys.stdout)
             return 0
     if args.command == "config":
         if args.config_command == "path":
