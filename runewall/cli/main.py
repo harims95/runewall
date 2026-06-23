@@ -86,6 +86,17 @@ MCP_LATER_TOOLS = (
     "runewall.rollback",
     "runewall.log",
 )
+MCP_SUPPORTED_METHODS = ("initialize", "tools/list", "tools/call")
+MCP_NOT_SUPPORTED_YET = (
+    "continuous_serve_loop",
+    "runewall.execute",
+    "runewall.approve",
+    "runewall.reject",
+    "runewall.rollback",
+    "runewall.log",
+    "http_server",
+    "hosted_backend",
+)
 MCP_TOOL_DEFINITIONS = (
     {
         "name": "runewall.policy_test",
@@ -345,6 +356,25 @@ def _doctor_result(root: Path) -> dict[str, object]:
         "maps": {"bundled_count": maps_count},
         "policy_audit": policy_audit,
         "summary": summary,
+    }
+
+
+def _mcp_status_result() -> dict[str, object]:
+    return {
+        "ok": True,
+        "mcp": {
+            "mode": "stdio-once",
+            "methods": list(MCP_SUPPORTED_METHODS),
+            "supported_tools": list(MCP_INITIAL_TOOLS),
+            "not_supported_yet": list(MCP_NOT_SUPPORTED_YET),
+            "safety": {
+                "local_only": True,
+                "dry_run_external_api_calls": False,
+                "token_storage": False,
+                "token_printing": False,
+                "execute_exposed": False,
+            },
+        },
     }
 
 
@@ -639,6 +669,8 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_subcommands = mcp_parser.add_subparsers(dest="mcp_command", required=True)
     mcp_tools_parser = mcp_subcommands.add_parser("tools", help="List planned MCP tools.")
     mcp_tools_parser.add_argument("--json", action="store_true", dest="json_output")
+    mcp_status_parser = mcp_subcommands.add_parser("status", help="Show MCP readiness and supported tool surface.")
+    mcp_status_parser.add_argument("--json", action="store_true", dest="json_output")
     mcp_serve_parser = mcp_subcommands.add_parser("serve", help="Run a local MCP stdio skeleton.")
     mcp_serve_parser.add_argument("--once", action="store_true")
     policy_parser = subcommands.add_parser(
@@ -760,6 +792,40 @@ def main(argv: list[str] | None = None) -> int:
             print("Later:")
             for tool in MCP_LATER_TOOLS:
                 print(f"- {tool}")
+            return 0
+        if args.mcp_command == "status":
+            result = _mcp_status_result()
+            if args.json_output:
+                print(json.dumps(result))
+                return 0
+            print("MCP status")
+            print("")
+            print("Mode:")
+            print("")
+            print("* stdio --once supported")
+            print("")
+            print("Supported methods:")
+            print("")
+            for method in result["mcp"]["methods"]:
+                print(f"* {method}")
+            print("")
+            print("Supported tools:")
+            print("")
+            for tool in result["mcp"]["supported_tools"]:
+                print(f"* {tool}")
+            print("")
+            print("Not supported yet:")
+            print("")
+            for item in result["mcp"]["not_supported_yet"]:
+                print(f"* {item}")
+            print("")
+            print("Safety:")
+            print("")
+            print("* local-only")
+            print("* dry-run does not call external APIs")
+            print("* no token storage")
+            print("* no token printing")
+            print("* execute not exposed through MCP")
             return 0
         if args.mcp_command == "serve":
             if not args.once:

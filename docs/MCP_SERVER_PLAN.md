@@ -12,6 +12,8 @@ Agents and tools need a standard way to route actions through Runewall:
 
 ## Initial MCP tools to expose
 
+Implemented now for local `stdio --once`:
+
 - `runewall.policy_test`
 - `runewall.policy_audit`
 - `runewall.dry_run`

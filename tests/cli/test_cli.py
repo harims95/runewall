@@ -55,6 +55,31 @@ class CliTests(unittest.TestCase):
         self.assertIn("runewall.dry_run", data["initial_tools"])
         self.assertIn("runewall.release_check", data["initial_tools"])
 
+    def test_mcp_status_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["mcp", "status"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("MCP status", rendered)
+        self.assertIn("* stdio --once supported", rendered)
+        self.assertIn("* tools/call", rendered)
+        self.assertIn("* runewall.dry_run", rendered)
+
+    def test_mcp_status_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["mcp", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertIn("initialize", data["mcp"]["methods"])
+        self.assertIn("tools/list", data["mcp"]["methods"])
+        self.assertIn("tools/call", data["mcp"]["methods"])
+        self.assertIn("runewall.dry_run", data["mcp"]["supported_tools"])
+        self.assertFalse(data["mcp"]["safety"]["execute_exposed"])
+
     def test_mcp_serve_once_handles_initialize(self) -> None:
         output = io.StringIO()
         with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}')):
