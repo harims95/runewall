@@ -154,7 +154,7 @@ MCP_TOOL_DEFINITIONS = (
         },
     },
 )
-RUNEWALL_VERSION = "0.2.0"
+RUNEWALL_VERSION = "0.3.1"
 
 
 def _policy_audit_report(root: Path) -> dict[str, object]:
