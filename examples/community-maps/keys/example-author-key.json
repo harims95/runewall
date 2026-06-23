@@ -1,0 +1,6 @@
+{
+  "key_id": "example-author-key",
+  "algorithm": "ed25519",
+  "public_key": "base64-public-key-placeholder",
+  "source": "local-file"
+}

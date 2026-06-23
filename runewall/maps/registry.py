@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 from dataclasses import dataclass
@@ -123,8 +124,18 @@ class TrustedKeyRecord:
     status: str
 
 
+@dataclass(frozen=True)
+class TrustKeyReport:
+    ok: bool
+    key_id: str | None
+    stored_at: str | None
+    errors: list[str]
+    error_code: str | None
+
+
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
 _COMMUNITY_SECRET_KEYS = ("token", "api_key", "secret", "password", "private_key")
+_SUPPORTED_KEY_ALGORITHMS = frozenset({"ed25519"})
 _MANIFEST_REQUIRED_STR = ("manifest_version", "name", "version", "description")
 _MANIFEST_REQUIRED_DICT = ("author", "permissions", "safety", "checksums")
 _MANIFEST_MAP_REQUIRED = ("path", "site", "flow", "action_type")
@@ -220,6 +231,58 @@ class SiteMapRegistry:
             if record.key_id == key_id:
                 return record
         return None
+
+    def trust_key_file(self, path: Path, root: Path | None = None, *, force: bool = False) -> TrustKeyReport:
+        resolved = str(path)
+        if not path.exists():
+            return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=[f"file not found: {resolved}"], error_code="file_not_found")
+        if not path.is_file():
+            return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=[f"not a file: {resolved}"], error_code="not_a_file")
+
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except json.JSONDecodeError as exc:
+            return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=[f"invalid JSON: {exc.msg}"], error_code="invalid_json")
+
+        if not isinstance(data, dict):
+            return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=["key file must be a JSON object"], error_code="invalid_format")
+
+        for key_name in data:
+            if any(p in str(key_name).lower() for p in _COMMUNITY_SECRET_KEYS):
+                return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=["Private keys must not be stored in Runewall trusted key records"], error_code="private_key_not_allowed")
+
+        key_id = data.get("key_id")
+        algorithm = data.get("algorithm")
+        public_key = data.get("public_key")
+
+        if not isinstance(key_id, str) or not key_id.strip():
+            return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=["missing required field 'key_id'"], error_code="missing_field")
+        if not isinstance(algorithm, str) or not algorithm.strip():
+            return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=["missing required field 'algorithm'"], error_code="missing_field")
+        if not isinstance(public_key, str) or not public_key.strip():
+            return TrustKeyReport(ok=False, key_id=None, stored_at=None, errors=["missing required field 'public_key'"], error_code="missing_field")
+
+        if algorithm.lower() not in _SUPPORTED_KEY_ALGORITHMS:
+            supported = ", ".join(sorted(_SUPPORTED_KEY_ALGORITHMS))
+            return TrustKeyReport(ok=False, key_id=key_id, stored_at=None, errors=[f"unsupported algorithm: {algorithm!r}; supported: {supported}"], error_code="unsupported_algorithm")
+
+        source = data.get("source", "local-file")
+        if not isinstance(source, str) or not source.strip():
+            source = "local-file"
+
+        destination_dir = self.trusted_keys_path(root)
+        destination_path = destination_dir / f"{key_id}.json"
+        if destination_path.exists() and not force:
+            return TrustKeyReport(ok=False, key_id=key_id, stored_at=None, errors=["Trusted key already exists"], error_code="key_already_exists")
+
+        trusted_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        record = {"key_id": key_id, "algorithm": algorithm, "public_key": public_key, "trusted_at": trusted_at, "source": source, "status": "trusted"}
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination_path.write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+        stored_at = (Path(".runewall") / "trusted-keys" / f"{key_id}.json").as_posix()
+        return TrustKeyReport(ok=True, key_id=key_id, stored_at=stored_at, errors=[], error_code=None)
 
     def list_maps(self) -> list[SiteMap]:
         maps: list[SiteMap] = []

@@ -53,7 +53,7 @@ One JSON file per trusted key, keyed by `key_id`.
 
 ## 6. Commands
 
-`keys status`, `keys list`, and `keys inspect` are implemented. All three are read-only — they do not trust new keys, verify signatures, or call external APIs. Trust and revoke are future work.
+`keys status`, `keys list`, `keys inspect`, and `keys trust` are implemented. Revoke is future work.
 
 ```
 runewall maps community keys status
@@ -62,6 +62,9 @@ runewall maps community keys list
 runewall maps community keys list --json
 runewall maps community keys inspect <key-id>
 runewall maps community keys inspect <key-id> --json
+runewall maps community keys trust <key-file>
+runewall maps community keys trust <key-file> --json
+runewall maps community keys trust <key-file> --force
 ```
 
 `keys status` — shows the key store mode, storage path, implemented features, and safety posture.
@@ -70,14 +73,19 @@ runewall maps community keys inspect <key-id> --json
 
 `keys inspect <key-id>` — finds and shows details for a single key record by key id. Does not include the public key in output. Returns `key_not_found` if the key id is not in the local store.
 
+`keys trust <key-file>` — validates a local JSON key file and stores it as a trusted key record under `.runewall/trusted-keys/<key_id>.json`. Adds `trusted_at` timestamp and `status: trusted`. Trust is local-only and explicit. Trusting a key does not enable signature verification and does not enable community map execution.
+
+Required key file fields: `key_id`, `algorithm`, `public_key`. Optional: `source` (defaults to `local-file`). Supported algorithms: `ed25519`. Fields with secret-like names (`private_key`, `token`, `api_key`, `secret`, `password`) are rejected.
+
+Use `--force` to overwrite an existing trusted key record. Without `--force`, trusting an already-trusted key id returns `key_already_exists`.
+
+See `examples/community-maps/keys/example-author-key.json` for an example key file.
+
 Future (not yet implemented):
 
 ```
-runewall maps community keys trust <key-file>
 runewall maps community keys revoke <key-id>
 ```
-
-`keys trust <key-file>` — add a public key file to the local trust store.
 
 `keys revoke <key-id>` — mark a trusted key as revoked so it fails future verification.
 

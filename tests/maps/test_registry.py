@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageImportReport, PackageInspectReport, SiteMapRegistry, TrustedKeyRecord
+from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageImportReport, PackageInspectReport, SiteMapRegistry, TrustKeyReport, TrustedKeyRecord
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -708,6 +708,55 @@ class SiteMapRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             record = registry.inspect_trusted_key("no-such-key", Path(temp_dir))
         self.assertIsNone(record)
+
+    def _example_key_file(self) -> Path:
+        return ROOT / "examples" / "community-maps" / "keys" / "example-author-key.json"
+
+    def test_trust_key_file_stores_record_with_trusted_status(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = registry.trust_key_file(self._example_key_file(), Path(temp_dir))
+            stored_path = Path(temp_dir) / ".runewall" / "trusted-keys" / "example-author-key.json"
+            stored_data = json.loads(stored_path.read_text(encoding="utf-8"))
+        self.assertIsInstance(report, TrustKeyReport)
+        self.assertTrue(report.ok)
+        self.assertEqual(report.key_id, "example-author-key")
+        self.assertEqual(stored_data["status"], "trusted")
+        self.assertIn("trusted_at", stored_data)
+        self.assertNotIn("private_key", stored_data)
+
+    def test_trust_key_file_fails_for_private_key_field(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "key.json"
+            path.write_text(json.dumps({"key_id": "k", "algorithm": "ed25519", "public_key": "x", "private_key": "secret"}), encoding="utf-8")
+            report = registry.trust_key_file(path, Path(temp_dir))
+        self.assertFalse(report.ok)
+        self.assertEqual(report.error_code, "private_key_not_allowed")
+
+    def test_trust_key_file_fails_for_unsupported_algorithm(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "key.json"
+            path.write_text(json.dumps({"key_id": "k", "algorithm": "rsa", "public_key": "x"}), encoding="utf-8")
+            report = registry.trust_key_file(path, Path(temp_dir))
+        self.assertFalse(report.ok)
+        self.assertEqual(report.error_code, "unsupported_algorithm")
+
+    def test_trust_key_file_fails_if_exists_without_force(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            registry.trust_key_file(self._example_key_file(), Path(temp_dir))
+            report = registry.trust_key_file(self._example_key_file(), Path(temp_dir))
+        self.assertFalse(report.ok)
+        self.assertEqual(report.error_code, "key_already_exists")
+
+    def test_trust_key_file_overwrites_with_force(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            registry.trust_key_file(self._example_key_file(), Path(temp_dir))
+            report = registry.trust_key_file(self._example_key_file(), Path(temp_dir), force=True)
+        self.assertTrue(report.ok)
 
 
 if __name__ == "__main__":

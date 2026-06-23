@@ -975,6 +975,148 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["ok"])
         self.assertEqual(data["error_code"], "key_not_found")
 
+    _EXAMPLE_KEY = ROOT / "examples" / "community-maps" / "keys" / "example-author-key.json"
+
+    def test_keys_trust_example_key_exits_zero(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY)])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Community map trusted key: OK", output.getvalue())
+        self.assertIn("Key ID: example-author-key", output.getvalue())
+
+    def test_keys_trust_example_key_json_and_stored_file(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY), "--json"])
+                stored_path = Path(temp_dir) / ".runewall" / "trusted-keys" / "example-author-key.json"
+                stored_data = json.loads(stored_path.read_text(encoding="utf-8"))
+                file_exists = stored_path.exists()
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["key_id"], "example-author-key")
+        self.assertFalse(data["signature_verification_enabled"])
+        self.assertFalse(data["community_execution_enabled"])
+        self.assertTrue(file_exists)
+        self.assertEqual(stored_data["status"], "trusted")
+        self.assertIn("trusted_at", stored_data)
+        self.assertNotIn("private_key", stored_data)
+
+    def test_keys_trust_existing_key_without_force_fails(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY)])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY), "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error_code"], "key_already_exists")
+
+    def test_keys_trust_with_force_succeeds(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY)])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY), "--force", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(json.loads(output.getvalue())["ok"])
+
+    def test_keys_trust_private_key_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            key_file = Path(temp_dir) / "bad-key.json"
+            key_file.write_text(
+                json.dumps({"key_id": "k", "algorithm": "ed25519", "public_key": "x", "private_key": "secret"}),
+                encoding="utf-8",
+            )
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "trust", str(key_file), "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error_code"], "private_key_not_allowed")
+
+    def test_keys_trust_unsupported_algorithm_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            key_file = Path(temp_dir) / "rsa-key.json"
+            key_file.write_text(
+                json.dumps({"key_id": "k", "algorithm": "rsa", "public_key": "x"}),
+                encoding="utf-8",
+            )
+            original_cwd = Path.cwd()
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "trust", str(key_file), "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(json.loads(output.getvalue())["error_code"], "unsupported_algorithm")
+
+    def test_keys_list_shows_trusted_key_after_trust(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY)])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "list", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        key_ids = [k["key_id"] for k in data["trusted_keys"]]
+        self.assertIn("example-author-key", key_ids)
+
+    def test_keys_inspect_shows_trusted_key_after_trust(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                main(["maps", "community", "keys", "trust", str(self._EXAMPLE_KEY)])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "inspect", "example-author-key", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["key"]["key_id"], "example-author-key")
+        self.assertEqual(data["key"]["status"], "trusted")
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (
