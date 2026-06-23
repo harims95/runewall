@@ -103,6 +103,8 @@ SDK_NOT_EXPOSED_YET = (
 COMMUNITY_MAPS_SUPPORTED = (
     "validate_local_map_files",
     "inspect_safety_posture",
+    "import_validated_maps_locally",
+    "list_imported_maps",
 )
 COMMUNITY_MAPS_NOT_SUPPORTED_YET = (
     "remote_registry",
@@ -110,6 +112,12 @@ COMMUNITY_MAPS_NOT_SUPPORTED_YET = (
     "signed_map_verification",
     "community_map_execution",
     "automatic_installation",
+)
+COMMUNITY_MAPS_AVAILABLE_COMMANDS = (
+    "runewall maps community validate <path>",
+    "runewall maps community inspect <path>",
+    "runewall maps community import <path>",
+    "runewall maps community list",
 )
 MCP_SUPPORTED_METHODS = ("initialize", "tools/list", "tools/call")
 MCP_NOT_SUPPORTED_YET = (
@@ -425,6 +433,7 @@ def _community_maps_status_result() -> dict[str, object]:
         "ok": True,
         "community_maps": {
             "mode": "local-files-only",
+            "available_commands": list(COMMUNITY_MAPS_AVAILABLE_COMMANDS),
             "supported": list(COMMUNITY_MAPS_SUPPORTED),
             "not_supported_yet": list(COMMUNITY_MAPS_NOT_SUPPORTED_YET),
             "safety": {
@@ -1385,6 +1394,11 @@ def main(argv: list[str] | None = None) -> int:
                 print("Mode:")
                 print("")
                 print("* local files only")
+                print("")
+                print("Available commands:")
+                print("")
+                for command in result["community_maps"]["available_commands"]:
+                    print(f"* {command}")
                 print("")
                 print("Supported:")
                 print("")

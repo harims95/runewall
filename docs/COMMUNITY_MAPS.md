@@ -2,6 +2,8 @@
 
 Community maps are local files only for now.
 
+v0.5 community maps are local-only and non-executable.
+
 ## Current scope
 
 - local community map files only
@@ -33,6 +35,17 @@ Community maps are local files only for now.
 - inspect shows local metadata such as `site`, `flow`, and `action_type`
 - inspect does not import a map
 - inspect does not execute a map
+
+## Quickstart
+
+1. Validate the bundled example:
+   `runewall maps community validate examples/community-maps/github_create_issue.safe.json`
+2. Inspect the bundled example:
+   `runewall maps community inspect examples/community-maps/github_create_issue.safe.json`
+3. Import the validated example locally:
+   `runewall maps community import examples/community-maps/github_create_issue.safe.json`
+4. List imported maps:
+   `runewall maps community list`
 
 ## Commands
 
