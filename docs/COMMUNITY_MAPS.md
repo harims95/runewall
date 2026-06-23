@@ -27,6 +27,13 @@ Community maps are local files only for now.
 - imported community maps are not executable yet
 - remote registry and downloads are still future work
 
+## Inspect
+
+- `runewall maps community inspect PATH` validates a local file and reports its safety posture
+- inspect shows local metadata such as `site`, `flow`, and `action_type`
+- inspect does not import a map
+- inspect does not execute a map
+
 ## Commands
 
 ```bash
@@ -34,6 +41,8 @@ runewall maps community status
 runewall maps community status --json
 runewall maps community list
 runewall maps community list --json
+runewall maps community inspect path/to/map.json
+runewall maps community inspect path/to/map.json --json
 runewall maps community import path/to/map.json
 runewall maps community import path/to/map.json --json
 runewall maps community validate path/to/map.json

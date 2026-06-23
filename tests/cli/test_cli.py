@@ -255,6 +255,55 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["validated"])
         self.assertFalse(imported_exists)
 
+    def test_community_maps_inspect_valid_example_exits_zero(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "inspect", str(example_path)])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map inspect", rendered)
+        self.assertIn("Site: github", rendered)
+        self.assertIn("Flow: create_issue", rendered)
+        self.assertIn("Execute enabled: false", rendered)
+
+    def test_community_maps_inspect_valid_example_json_returns_ok_true(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "inspect", str(example_path), "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["site"], "github")
+        self.assertEqual(data["flow"], "create_issue")
+        self.assertFalse(data["safety"]["execute_enabled"])
+
+    def test_community_maps_inspect_missing_file_returns_clear_error(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "inspect", "missing-community-map.json", "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("file not found" in error for error in data["validation"]["errors"]))
+
+    def test_community_maps_inspect_secret_like_fields_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text(
+                '{"site":"github","flow":"create_issue","action_type":"map.dry_run","token":"abc"}',
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "inspect", str(map_path), "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(data["safety"]["contains_secrets"])
+        self.assertFalse(data["safety"]["execute_enabled"])
+
     def test_community_maps_list_exits_zero(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             original_cwd = Path.cwd()
