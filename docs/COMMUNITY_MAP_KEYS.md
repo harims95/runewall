@@ -53,30 +53,31 @@ One JSON file per trusted key, keyed by `key_id`.
 
 ## 6. Commands
 
-`keys status` and `keys list` are implemented. Trust, inspect, and revoke are future work. `keys list` is read-only — it does not trust new keys, verify signatures, or call external APIs.
+`keys status`, `keys list`, and `keys inspect` are implemented. All three are read-only — they do not trust new keys, verify signatures, or call external APIs. Trust and revoke are future work.
 
 ```
 runewall maps community keys status
 runewall maps community keys status --json
 runewall maps community keys list
 runewall maps community keys list --json
+runewall maps community keys inspect <key-id>
+runewall maps community keys inspect <key-id> --json
 ```
 
 `keys status` — shows the key store mode, storage path, implemented features, and safety posture.
 
 `keys list` — reads local key records from `.runewall/trusted-keys/` and lists key ids, algorithms, and status. Returns an empty list if the folder does not exist. Invalid key records produce a warning and are skipped.
 
+`keys inspect <key-id>` — finds and shows details for a single key record by key id. Does not include the public key in output. Returns `key_not_found` if the key id is not in the local store.
+
 Future (not yet implemented):
 
 ```
 runewall maps community keys trust <key-file>
-runewall maps community keys inspect <key-id>
 runewall maps community keys revoke <key-id>
 ```
 
 `keys trust <key-file>` — add a public key file to the local trust store.
-
-`keys inspect <key-id>` — show details for a single trusted key.
 
 `keys revoke <key-id>` — mark a trusted key as revoked so it fails future verification.
 

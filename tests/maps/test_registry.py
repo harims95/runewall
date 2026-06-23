@@ -683,6 +683,32 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertEqual(records, [])
         self.assertTrue(any("bad.json" in w for w in warnings))
 
+    def test_inspect_trusted_key_returns_record(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "example.json").write_text(
+                json.dumps({
+                    "key_id": "example-author-key", "algorithm": "ed25519",
+                    "public_key": "base64-placeholder", "trusted_at": "2026-01-01T00:00:00Z",
+                    "source": "local-file", "status": "trusted",
+                }),
+                encoding="utf-8",
+            )
+            record = registry.inspect_trusted_key("example-author-key", Path(temp_dir))
+        self.assertIsNotNone(record)
+        assert record is not None
+        self.assertIsInstance(record, TrustedKeyRecord)
+        self.assertEqual(record.key_id, "example-author-key")
+        self.assertEqual(record.algorithm, "ed25519")
+
+    def test_inspect_trusted_key_returns_none_for_unknown(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            record = registry.inspect_trusted_key("no-such-key", Path(temp_dir))
+        self.assertIsNone(record)
+
 
 if __name__ == "__main__":
     unittest.main()

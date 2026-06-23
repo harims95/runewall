@@ -214,6 +214,13 @@ class SiteMapRegistry:
             ))
         return records, warnings
 
+    def inspect_trusted_key(self, key_id: str, root: Path | None = None) -> TrustedKeyRecord | None:
+        records, _ = self.list_trusted_keys(root)
+        for record in records:
+            if record.key_id == key_id:
+                return record
+        return None
+
     def list_maps(self) -> list[SiteMap]:
         maps: list[SiteMap] = []
         sites_root = resources.files("runewall.maps").joinpath("sites")

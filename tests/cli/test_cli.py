@@ -893,6 +893,88 @@ class CliTests(unittest.TestCase):
         self.assertIn("warnings", data)
         self.assertTrue(any("bad.json" in w for w in data["warnings"]))
 
+    def _write_test_key(self, keys_dir: Path, key_id: str = "example-author-key") -> None:
+        keys_dir.mkdir(parents=True, exist_ok=True)
+        (keys_dir / f"{key_id}.json").write_text(
+            json.dumps({
+                "key_id": key_id, "algorithm": "ed25519",
+                "public_key": "base64-placeholder",
+                "trusted_at": "2026-01-01T00:00:00Z",
+                "source": "local-file", "status": "trusted",
+            }),
+            encoding="utf-8",
+        )
+
+    def test_keys_inspect_exits_zero_for_valid_key(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self._write_test_key(Path(temp_dir) / ".runewall" / "trusted-keys")
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "inspect", "example-author-key"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map trusted key inspect", rendered)
+        self.assertIn("Key ID: example-author-key", rendered)
+        self.assertIn("Algorithm: ed25519", rendered)
+        self.assertNotIn("base64-placeholder", rendered)
+
+    def test_keys_inspect_json_returns_ok_true(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            self._write_test_key(Path(temp_dir) / ".runewall" / "trusted-keys")
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "inspect", "example-author-key", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["key"]["key_id"], "example-author-key")
+        self.assertNotIn("public_key", data["key"])
+        self.assertFalse(data["safety"]["private_key_included"])
+        self.assertFalse(data["safety"]["community_execution_enabled"])
+
+    def test_keys_inspect_unknown_key_returns_not_found(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "inspect", "no-such-key", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error_code"], "key_not_found")
+
+    def test_keys_inspect_invalid_record_does_not_crash(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "bad.json").write_text("not-valid-json", encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "inspect", "example-author-key", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error_code"], "key_not_found")
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (

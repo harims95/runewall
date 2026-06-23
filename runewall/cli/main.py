@@ -803,6 +803,9 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_keys_status_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_community_keys_list_parser = maps_community_keys_subcommands.add_parser("list", help="List locally trusted public keys.")
     maps_community_keys_list_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_keys_inspect_parser = maps_community_keys_subcommands.add_parser("inspect", help="Inspect a locally trusted key by key-id.")
+    maps_community_keys_inspect_parser.add_argument("key_id", nargs="?", default=None)
+    maps_community_keys_inspect_parser.add_argument("--json", action="store_true", dest="json_output")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1803,6 +1806,46 @@ def main(argv: list[str] | None = None) -> int:
                         print("Warnings:")
                         for w in warnings:
                             print(f"- {w}")
+                    return 0
+                if args.maps_community_keys_command == "inspect":
+                    _safety: dict[str, object] = {
+                        "private_key_included": False,
+                        "signature_verification_performed": False,
+                        "community_execution_enabled": False,
+                    }
+                    if not args.key_id:
+                        if args.json_output:
+                            print(json.dumps({"ok": False, "error": "Missing required argument: key-id", "error_code": "missing_key_id"}))
+                            return 1
+                        print("Missing required argument: key-id")
+                        return 1
+                    record = registry.inspect_trusted_key(args.key_id, Path.cwd())
+                    if record is None:
+                        if args.json_output:
+                            print(json.dumps({"ok": False, "error": "Trusted key not found", "error_code": "key_not_found"}))
+                            return 1
+                        print(f"Trusted key not found: {args.key_id}")
+                        return 1
+                    if args.json_output:
+                        print(json.dumps({
+                            "ok": True,
+                            "key": {
+                                "key_id": record.key_id,
+                                "algorithm": record.algorithm,
+                                "trusted_at": record.trusted_at,
+                                "source": record.source,
+                                "status": record.status,
+                            },
+                            "safety": _safety,
+                        }))
+                        return 0
+                    print("Community map trusted key inspect")
+                    print("")
+                    print(f"Key ID: {record.key_id}")
+                    print(f"Algorithm: {record.algorithm}")
+                    print(f"Status: {record.status}")
+                    print(f"Source: {record.source}")
+                    print(f"Trusted at: {record.trusted_at}")
                     return 0
         if args.maps_command == "list":
             site_maps = registry.list_maps()
