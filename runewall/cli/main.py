@@ -292,6 +292,62 @@ def _release_check_result(root: Path) -> dict[str, object]:
     return _release_check_report(root)
 
 
+def _doctor_result(root: Path) -> dict[str, object]:
+    db_exists = database_path(root).exists()
+    httpx_available = importlib.util.find_spec("httpx") is not None
+    bs4_available = importlib.util.find_spec("bs4") is not None
+    maps_count = len(SiteMapRegistry().list_maps())
+    config_exists = config_path(root).exists()
+    cfg = load_config(root)
+    policy_audit = _policy_audit_result(root)
+    allow_execute = cfg.maps.allow_execute
+
+    github_env = cfg.auth.github_token_env
+    vercel_env = cfg.auth.vercel_token_env
+    netlify_env = cfg.auth.netlify_token_env
+    supabase_env = cfg.auth.supabase_access_token_env
+    cloudflare_env = cfg.auth.cloudflare_api_token_env
+
+    github_token_set = bool(os.environ.get(github_env))
+    vercel_token_set = bool(os.environ.get(vercel_env))
+    netlify_token_set = bool(os.environ.get(netlify_env))
+    supabase_token_set = bool(os.environ.get(supabase_env))
+    cloudflare_token_set = bool(os.environ.get(cloudflare_env))
+
+    if not httpx_available or not bs4_available or policy_audit["level"] == "INVALID":
+        summary = "FAIL"
+    elif not db_exists or not github_token_set or not vercel_token_set or not netlify_token_set or not supabase_token_set or not cloudflare_token_set or allow_execute or policy_audit["level"] == "WARN":
+        summary = "WARN"
+    else:
+        summary = "OK"
+
+    return {
+        "python": {"version": sys.version.split()[0], "ok": True},
+        "database": {"present": db_exists, "path": str(database_path(root))},
+        "config": {
+            "present": config_exists,
+            "path": str(config_path(root).resolve()),
+            "map_execution": "ENABLED" if allow_execute else "disabled",
+        },
+        "dependencies": {"httpx": httpx_available, "bs4": bs4_available},
+        "auth": {
+            "github_token": "present" if github_token_set else "missing",
+            "vercel_token": "present" if vercel_token_set else "missing",
+            "netlify_token": "present" if netlify_token_set else "missing",
+            "supabase_access_token": "present" if supabase_token_set else "missing",
+            "cloudflare_api_token": "present" if cloudflare_token_set else "missing",
+            "github": {"env": github_env, "status": "present" if github_token_set else "missing"},
+            "vercel": {"env": vercel_env, "status": "present" if vercel_token_set else "missing"},
+            "netlify": {"env": netlify_env, "status": "present" if netlify_token_set else "missing"},
+            "supabase": {"env": supabase_env, "status": "present" if supabase_token_set else "missing"},
+            "cloudflare": {"env": cloudflare_env, "status": "present" if cloudflare_token_set else "missing"},
+        },
+        "maps": {"bundled_count": maps_count},
+        "policy_audit": policy_audit,
+        "summary": summary,
+    }
+
+
 def _mcp_once_response(raw_message: str) -> dict[str, object]:
     try:
         request = json.loads(raw_message)
@@ -334,6 +390,8 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
             tool_result = _policy_audit_result(Path.cwd())
         elif tool_name == "runewall.release_check":
             tool_result = _release_check_result(Path.cwd())
+        elif tool_name == "runewall.doctor":
+            tool_result = _doctor_result(Path.cwd())
         else:
             return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
         return _jsonrpc_response(
@@ -1292,13 +1350,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Runewall {ver}")
         return 0
     if args.command == "doctor":
-        db_exists = database_path(Path.cwd()).exists()
-        httpx_available = importlib.util.find_spec("httpx") is not None
-        bs4_available = importlib.util.find_spec("bs4") is not None
-        maps_count = len(SiteMapRegistry().list_maps())
-        config_exists = config_path(Path.cwd()).exists()
+        report = _doctor_result(Path.cwd())
         cfg = load_config(Path.cwd())
-        policy_audit = _policy_audit_report(Path.cwd())
+        policy_audit = report["policy_audit"]
         allow_execute = cfg.maps.allow_execute
 
         github_env = cfg.auth.github_token_env
@@ -1307,45 +1361,20 @@ def main(argv: list[str] | None = None) -> int:
         supabase_env = cfg.auth.supabase_access_token_env
         cloudflare_env = cfg.auth.cloudflare_api_token_env
 
-        github_token_set = bool(os.environ.get(github_env))
-        vercel_token_set = bool(os.environ.get(vercel_env))
-        netlify_token_set = bool(os.environ.get(netlify_env))
-        supabase_token_set = bool(os.environ.get(supabase_env))
-        cloudflare_token_set = bool(os.environ.get(cloudflare_env))
-
-        if not httpx_available or not bs4_available or policy_audit["level"] == "INVALID":
-            summary = "FAIL"
-        elif not db_exists or not github_token_set or not vercel_token_set or not netlify_token_set or not supabase_token_set or not cloudflare_token_set or allow_execute or policy_audit["level"] == "WARN":
-            summary = "WARN"
-        else:
-            summary = "OK"
+        github_token_set = report["auth"]["github"]["status"] == "present"
+        vercel_token_set = report["auth"]["vercel"]["status"] == "present"
+        netlify_token_set = report["auth"]["netlify"]["status"] == "present"
+        supabase_token_set = report["auth"]["supabase"]["status"] == "present"
+        cloudflare_token_set = report["auth"]["cloudflare"]["status"] == "present"
+        db_exists = report["database"]["present"]
+        config_exists = report["config"]["present"]
+        httpx_available = report["dependencies"]["httpx"]
+        bs4_available = report["dependencies"]["bs4"]
+        maps_count = report["maps"]["bundled_count"]
+        summary = report["summary"]
 
         if args.json_output:
-            print(json.dumps({
-                "python": {"version": sys.version.split()[0], "ok": True},
-                "database": {"present": db_exists, "path": str(database_path(Path.cwd()))},
-                "config": {
-                    "present": config_exists,
-                    "path": str(config_path(Path.cwd()).resolve()),
-                    "map_execution": "ENABLED" if allow_execute else "disabled",
-                },
-                "dependencies": {"httpx": httpx_available, "bs4": bs4_available},
-                "auth": {
-                    "github_token": "present" if github_token_set else "missing",
-                    "vercel_token": "present" if vercel_token_set else "missing",
-                    "netlify_token": "present" if netlify_token_set else "missing",
-                    "supabase_access_token": "present" if supabase_token_set else "missing",
-                    "cloudflare_api_token": "present" if cloudflare_token_set else "missing",
-                    "github": {"env": github_env, "status": "present" if github_token_set else "missing"},
-                    "vercel": {"env": vercel_env, "status": "present" if vercel_token_set else "missing"},
-                    "netlify": {"env": netlify_env, "status": "present" if netlify_token_set else "missing"},
-                    "supabase": {"env": supabase_env, "status": "present" if supabase_token_set else "missing"},
-                    "cloudflare": {"env": cloudflare_env, "status": "present" if cloudflare_token_set else "missing"},
-                },
-                "maps": {"bundled_count": maps_count},
-                "policy_audit": policy_audit,
-                "summary": summary,
-            }))
+            print(json.dumps(report))
             return 0
 
         print(f"Python: {sys.version.split()[0]}")
