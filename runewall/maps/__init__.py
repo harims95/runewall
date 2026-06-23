@@ -1,5 +1,5 @@
 """Bundled action map registry helpers."""
 
-from .registry import CommunityMapValidationReport, MapValidationError, SiteMapRegistry
+from .registry import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, MapValidationError, SiteMapRegistry
 
-__all__ = ["CommunityMapValidationReport", "MapValidationError", "SiteMapRegistry"]
+__all__ = ["CommunityMapImportReport", "CommunityMapInspectReport", "CommunityMapValidationReport", "MapValidationError", "SiteMapRegistry"]

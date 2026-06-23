@@ -197,6 +197,110 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["ok"])
         self.assertTrue(any("flow" in error for error in data["errors"]))
 
+    def test_community_maps_import_valid_example_succeeds(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "import", str(example_path)])
+            finally:
+                os.chdir(original_cwd)
+            imported_path = Path(temp_dir) / ".runewall" / "community-maps" / example_path.name
+            imported_exists = imported_path.exists()
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Community map import: OK", output.getvalue())
+        self.assertTrue(imported_exists)
+
+    def test_community_maps_import_valid_example_json_returns_ok_true(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "import", str(example_path), "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["validated"])
+        self.assertFalse(data["execute_enabled"])
+        self.assertIn(".runewall/community-maps/", data["destination"])
+        self.assertNotIn("\\", data["destination"])
+
+    def test_community_maps_import_invalid_map_fails_and_does_not_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            invalid_map_path = Path(temp_dir) / "invalid-map.json"
+            invalid_map_path.write_text('{"site":"github","action_type":"map.dry_run","token":"x"}', encoding="utf-8")
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "import", str(invalid_map_path), "--json"])
+            finally:
+                os.chdir(original_cwd)
+            imported_path = Path(temp_dir) / ".runewall" / "community-maps" / invalid_map_path.name
+            imported_exists = imported_path.exists()
+        self.assertEqual(exit_code, 1)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["validated"])
+        self.assertFalse(imported_exists)
+
+    def test_community_maps_list_exits_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "list"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+
+    def test_community_maps_list_json_returns_ok_true(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "list", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["community_maps"], [])
+
+    def test_community_maps_list_includes_imported_map_after_import(self) -> None:
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["maps", "community", "import", str(example_path), "--json"])
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "list", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertIn(example_path.name, data["community_maps"])
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (
