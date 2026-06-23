@@ -71,7 +71,7 @@ class CliTests(unittest.TestCase):
             exit_code = main(["version"])
         self.assertEqual(exit_code, 0)
         rendered = output.getvalue().strip()
-        self.assertTrue(rendered.startswith("Runewall "))
+        self.assertEqual(rendered, "Runewall 0.2.0")
         self.assertNotIn("{", rendered)
 
     def test_version_json_prints_valid_json(self) -> None:
@@ -82,9 +82,7 @@ class CliTests(unittest.TestCase):
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["name"], "runewall")
-        self.assertIn("version", data)
-        self.assertIsInstance(data["version"], str)
-        self.assertTrue(len(data["version"]) > 0)
+        self.assertEqual(data["version"], "0.2.0")
 
     def test_version_json_matches_human_version(self) -> None:
         human_output = io.StringIO()

@@ -70,6 +70,7 @@ RELEASE_STATUS_RECOMMENDED_COMMANDS = (
     "runewall release json-check",
     "python -m pytest tests -v",
 )
+RUNEWALL_VERSION = "0.2.0"
 
 
 def _policy_audit_report(root: Path) -> dict[str, object]:
@@ -1092,7 +1093,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  required inputs: {', '.join(required_inputs) if required_inputs else 'none'}")
             return 0
     if args.command == "version":
-        ver = importlib.metadata.version("runewall")
+        ver = RUNEWALL_VERSION
         if args.json_output:
             print(json.dumps({"name": "runewall", "version": ver}))
             return 0
