@@ -58,6 +58,20 @@ class CommunityMapImportReport:
     errors: list[str]
 
 
+@dataclass(frozen=True)
+class CommunityMapInspectReport:
+    ok: bool
+    path: str
+    site: str | None
+    flow: str | None
+    action_type: str | None
+    validation_ok: bool
+    errors: list[str]
+    warnings: list[str]
+    execute_enabled: bool
+    contains_secrets: bool
+
+
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
 _COMMUNITY_SECRET_KEYS = ("token", "api_key", "secret", "password", "private_key")
 
@@ -237,6 +251,26 @@ class SiteMapRegistry:
 
         return CommunityMapValidationReport(ok=not errors, path=resolved_path, errors=errors, warnings=warnings)
 
+    def inspect_community_map_file(self, path: Path) -> CommunityMapInspectReport:
+        validation = self.validate_community_map_file(path)
+        data = self._load_community_map_data(path)
+        site = data.get("site") if isinstance(data.get("site"), str) and str(data.get("site", "")).strip() else None
+        flow = data.get("flow") if isinstance(data.get("flow"), str) and str(data.get("flow", "")).strip() else None
+        action_type = data.get("action_type") if isinstance(data.get("action_type"), str) and str(data.get("action_type", "")).strip() else None
+        contains_secrets = bool(data) and bool(self._find_matching_keys(data, _COMMUNITY_SECRET_KEYS))
+        return CommunityMapInspectReport(
+            ok=validation.ok,
+            path=validation.path,
+            site=site,
+            flow=flow,
+            action_type=action_type,
+            validation_ok=validation.ok,
+            errors=validation.errors,
+            warnings=validation.warnings,
+            execute_enabled=False,
+            contains_secrets=contains_secrets,
+        )
+
     def import_community_map_file(self, path: Path, root: Path | None = None) -> CommunityMapImportReport:
         report = self.validate_community_map_file(path)
         if not report.ok:
@@ -271,6 +305,18 @@ class SiteMapRegistry:
             [entry for entry in directory.iterdir() if entry.is_file()],
             key=lambda entry: entry.name,
         )
+
+    def _load_community_map_data(self, path: Path) -> dict[str, Any]:
+        if not path.exists() or not path.is_file():
+            return {}
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return data
 
     def _build_site_map(self, data: dict[str, Any], *, source: str) -> SiteMap:
         schema_version = self._require_str(data, "schema_version", source=source)

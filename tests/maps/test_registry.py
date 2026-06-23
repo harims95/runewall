@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapImportReport, CommunityMapValidationReport, MapValidationError, SiteMapRegistry
+from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, MapValidationError, SiteMapRegistry
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -313,6 +313,35 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertTrue(report.ok)
         self.assertTrue(imported_exists)
         self.assertEqual(report.destination, f".runewall/community-maps/{example_path.name}")
+
+    def test_inspect_community_map_file_reports_metadata_for_valid_file(self) -> None:
+        registry = SiteMapRegistry()
+        example_path = ROOT / "examples" / "community-maps" / "github_create_issue.safe.json"
+
+        report = registry.inspect_community_map_file(example_path)
+
+        self.assertIsInstance(report, CommunityMapInspectReport)
+        self.assertTrue(report.ok)
+        self.assertEqual(report.site, "github")
+        self.assertEqual(report.flow, "create_issue")
+        self.assertEqual(report.action_type, "map.dry_run")
+        self.assertFalse(report.execute_enabled)
+        self.assertFalse(report.contains_secrets)
+
+    def test_inspect_community_map_file_detects_secret_like_fields(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_path = Path(temp_dir) / "community-map.json"
+            map_path.write_text(
+                '{"site":"github","flow":"create_issue","action_type":"map.dry_run","token":"abc"}',
+                encoding="utf-8",
+            )
+
+            report = registry.inspect_community_map_file(map_path)
+
+        self.assertFalse(report.ok)
+        self.assertTrue(report.contains_secrets)
+        self.assertFalse(report.execute_enabled)
 
     def test_list_community_map_files_returns_empty_when_missing(self) -> None:
         registry = SiteMapRegistry()

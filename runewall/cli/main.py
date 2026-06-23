@@ -715,6 +715,9 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_import_parser = maps_community_subcommands.add_parser("import", help="Validate and copy a local community map file.")
     maps_community_import_parser.add_argument("path")
     maps_community_import_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_inspect_parser = maps_community_subcommands.add_parser("inspect", help="Inspect a local community map file.")
+    maps_community_inspect_parser.add_argument("path")
+    maps_community_inspect_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_community_validate_parser = maps_community_subcommands.add_parser("validate", help="Validate a local community map file.")
     maps_community_validate_parser.add_argument("path")
     maps_community_validate_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -1437,6 +1440,43 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     for error in report.errors:
                         print(f"- {error}")
+                return 0 if report.ok else 1
+            if args.maps_community_command == "inspect":
+                report = registry.inspect_community_map_file(Path(args.path))
+                if args.json_output:
+                    print(json.dumps({
+                        "ok": report.ok,
+                        "path": report.path,
+                        "site": report.site,
+                        "flow": report.flow,
+                        "action_type": report.action_type,
+                        "validation": {
+                            "ok": report.validation_ok,
+                            "errors": report.errors,
+                            "warnings": report.warnings,
+                        },
+                        "safety": {
+                            "execute_enabled": report.execute_enabled,
+                            "contains_secrets": report.contains_secrets,
+                        },
+                    }))
+                    return 0 if report.ok else 1
+                print("Community map inspect")
+                print("")
+                print(f"Path: {report.path}")
+                print(f"Site: {report.site or '-'}")
+                print(f"Flow: {report.flow or '-'}")
+                print(f"Action type: {report.action_type or '-'}")
+                print(f"Validation: {'OK' if report.validation_ok else 'FAILED'}")
+                print(f"Execute enabled: {str(report.execute_enabled).lower()}")
+                if report.errors:
+                    print("")
+                    for error in report.errors:
+                        print(f"- {error}")
+                if report.warnings:
+                    print("")
+                    for warning in report.warnings:
+                        print(f"- {warning}")
                 return 0 if report.ok else 1
             if args.maps_community_command == "list":
                 community_maps = [path.name for path in registry.list_community_map_files(Path.cwd())]
