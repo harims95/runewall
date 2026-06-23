@@ -288,6 +288,10 @@ def _policy_audit_result(root: Path) -> dict[str, object]:
     return _policy_audit_report(root)
 
 
+def _release_check_result(root: Path) -> dict[str, object]:
+    return _release_check_report(root)
+
+
 def _mcp_once_response(raw_message: str) -> dict[str, object]:
     try:
         request = json.loads(raw_message)
@@ -328,6 +332,8 @@ def _mcp_once_response(raw_message: str) -> dict[str, object]:
             tool_result = _policy_test_result(arguments["action_type"], Path.cwd())
         elif tool_name == "runewall.policy_audit":
             tool_result = _policy_audit_result(Path.cwd())
+        elif tool_name == "runewall.release_check":
+            tool_result = _release_check_result(Path.cwd())
         else:
             return _jsonrpc_response(message_id, error={"code": -32602, "message": "Unknown tool"})
         return _jsonrpc_response(
@@ -1650,7 +1656,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "release":
         if args.release_command == "check":
-            report = _release_check_report(Path.cwd())
+            report = _release_check_result(Path.cwd())
             if args.json_output:
                 print(json.dumps(report))
                 return 0 if report["ok"] else 1
