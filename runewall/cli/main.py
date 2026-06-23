@@ -70,6 +70,22 @@ RELEASE_STATUS_RECOMMENDED_COMMANDS = (
     "runewall release json-check",
     "python -m pytest tests -v",
 )
+MCP_INITIAL_TOOLS = (
+    "runewall.policy_test",
+    "runewall.policy_audit",
+    "runewall.dry_run",
+    "runewall.release_check",
+    "runewall.doctor",
+    "runewall.maps_list",
+    "runewall.maps_show",
+)
+MCP_LATER_TOOLS = (
+    "runewall.execute",
+    "runewall.approve",
+    "runewall.reject",
+    "runewall.rollback",
+    "runewall.log",
+)
 RUNEWALL_VERSION = "0.2.0"
 
 
@@ -200,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  act      dry-run or execute mapped actions\n"
             "  maps     inspect bundled action maps\n"
             "  config   inspect and manage local config\n"
+            "  mcp      inspect planned MCP tool surface\n"
             "  policy   explain, test, list, and audit safety policies\n"
             "  doctor   check local runtime health\n"
             "  release  run release readiness checks\n"
@@ -295,6 +312,14 @@ def build_parser() -> argparse.ArgumentParser:
     config_profile_parser = config_subcommands.add_parser("profile", help="Apply a named config profile.")
     config_profile_parser.add_argument("name")
     config_profile_parser.add_argument("--json", action="store_true", dest="json_output")
+    mcp_parser = subcommands.add_parser(
+        "mcp",
+        help="Inspect planned MCP tool surface.",
+        description="Inspect planned Runewall MCP tool surface.",
+    )
+    mcp_subcommands = mcp_parser.add_subparsers(dest="mcp_command", required=True)
+    mcp_tools_parser = mcp_subcommands.add_parser("tools", help="List planned MCP tools.")
+    mcp_tools_parser.add_argument("--json", action="store_true", dest="json_output")
     policy_parser = subcommands.add_parser(
         "policy",
         help="Explain, test, list, and audit safety policies.",
@@ -396,6 +421,25 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(f"Initialized Runewall at {db_path}")
         return 0
+    if args.command == "mcp":
+        if args.mcp_command == "tools":
+            if args.json_output:
+                print(json.dumps({
+                    "ok": True,
+                    "initial_tools": list(MCP_INITIAL_TOOLS),
+                    "later_tools": list(MCP_LATER_TOOLS),
+                }))
+                return 0
+            print("MCP tools")
+            print("")
+            print("Initial:")
+            for tool in MCP_INITIAL_TOOLS:
+                print(f"- {tool}")
+            print("")
+            print("Later:")
+            for tool in MCP_LATER_TOOLS:
+                print(f"- {tool}")
+            return 0
     if args.command == "config":
         if args.config_command == "path":
             path = config_path(Path.cwd()).resolve()

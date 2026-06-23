@@ -30,7 +30,30 @@ class CliTests(unittest.TestCase):
         self.assertEqual(error.exception.code, 0)
         rendered = output.getvalue()
         self.assertIn("Runewall is a local-first safety/runtime layer for AI agents.", rendered)
+        self.assertIn("mcp      inspect planned MCP tool surface", rendered)
         self.assertIn("policy   explain, test, list, and audit safety policies", rendered)
+
+    def test_mcp_tools_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["mcp", "tools"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("MCP tools", rendered)
+        self.assertIn("runewall.policy_test", rendered)
+        self.assertIn("runewall.release_check", rendered)
+
+    def test_mcp_tools_json_returns_valid_json(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["mcp", "tools", "--json"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertIn("runewall.policy_test", data["initial_tools"])
+        self.assertIn("runewall.dry_run", data["initial_tools"])
+        self.assertIn("runewall.release_check", data["initial_tools"])
 
     def test_policy_help_exits_zero_and_mentions_audit(self) -> None:
         output = io.StringIO()
