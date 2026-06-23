@@ -34,9 +34,14 @@
 
 - manifest signing design (docs/COMMUNITY_MAP_SIGNING.md)
 
+## v0.6.3
+
+- local trusted key store design (docs/COMMUNITY_MAP_KEYS.md)
+
 ## Future
 
-- local signature verification and explicit key trust store
+- local signature verification
+- key status/list/trust/revoke commands
 - stronger approval UX
 - local dashboard
 - browser automation

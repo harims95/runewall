@@ -87,6 +87,8 @@ v0.6.1 is signing design only. Signing verification is not yet implemented.
 
 SHA-256 checksum verification is implemented. A future signing block will allow publishers to sign manifests for provenance and tamper detection.
 
+A future local trusted key store (design in v0.6.3) will let users explicitly trust publisher public keys. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md).
+
 ## Commands
 
 ```bash
