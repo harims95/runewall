@@ -81,7 +81,8 @@ See [examples/community-maps/manifest.example.json](../examples/community-maps/m
 - tokens must come from environment variables only
 - community map execution remains disabled
 - `execute_enabled` and `community_execution_allowed` must both be `false`
-- checksum mismatch should fail validation in a future release
+- SHA-256 checksum verification is implemented: map files are read and hashed against `checksums` entries
+- checksum mismatch, missing checksum, or missing map file fails validation
 - remote downloads are future work
 - signed verification is future work
 

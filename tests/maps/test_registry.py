@@ -409,8 +409,13 @@ class SiteMapRegistryTests(unittest.TestCase):
         self.assertTrue(any("secret-like field" in e for e in report.errors))
 
     def test_validate_manifest_file_passes_with_requires_tokens_false(self) -> None:
+        import hashlib as _hashlib
         registry = SiteMapRegistry()
         with tempfile.TemporaryDirectory() as temp_dir:
+            map_content = b'{"site":"github","flow":"f","action_type":"map.dry_run"}'
+            map_file = Path(temp_dir) / "x.json"
+            map_file.write_bytes(map_content)
+            checksum = "sha256-" + _hashlib.sha256(map_content).hexdigest()
             path = Path(temp_dir) / "manifest.json"
             path.write_text(
                 json.dumps({
@@ -419,12 +424,13 @@ class SiteMapRegistryTests(unittest.TestCase):
                     "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
                     "permissions": {"external_api_calls": False, "requires_tokens": False, "execute_enabled": False},
                     "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
-                    "checksums": {},
+                    "checksums": {"x.json": checksum},
                 }),
                 encoding="utf-8",
             )
             report = registry.validate_manifest_file(path)
         self.assertTrue(report.ok, report.errors)
+        self.assertTrue(report.checksums_verified)
 
     def test_validate_manifest_file_fails_for_execute_enabled_true(self) -> None:
         registry = SiteMapRegistry()
@@ -463,6 +469,70 @@ class SiteMapRegistryTests(unittest.TestCase):
             report = registry.validate_manifest_file(path)
         self.assertFalse(report.ok)
         self.assertTrue(any("community_execution_allowed" in e for e in report.errors))
+
+    def test_validate_manifest_file_fails_for_missing_checksum(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_file = Path(temp_dir) / "mymap.json"
+            map_file.write_text('{"site":"github","flow":"f","action_type":"map.dry_run"}', encoding="utf-8")
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertFalse(report.ok)
+        self.assertFalse(report.checksums_verified)
+        self.assertTrue(any("missing checksum" in e for e in report.errors))
+
+    def test_validate_manifest_file_fails_for_wrong_checksum(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_file = Path(temp_dir) / "mymap.json"
+            map_file.write_text('{"site":"github","flow":"f","action_type":"map.dry_run"}', encoding="utf-8")
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": "sha256-wrong"},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertFalse(report.ok)
+        self.assertFalse(report.checksums_verified)
+        self.assertTrue(any("checksum mismatch" in e for e in report.errors))
+
+    def test_validate_manifest_file_fails_for_missing_map_file(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "nothere.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"nothere.json": "sha256-abc"},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertFalse(report.ok)
+        self.assertFalse(report.checksums_verified)
+        self.assertTrue(any("map file not found" in e for e in report.errors))
 
 
 if __name__ == "__main__":

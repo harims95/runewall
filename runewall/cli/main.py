@@ -1508,17 +1508,18 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"- {name}")
                 return 0
             if args.maps_community_command == "manifest":
-                _not_impl: dict[str, object] = {"implemented": False, "verified": False}
+                _signing: dict[str, object] = {"implemented": False, "verified": False}
                 if args.maps_community_manifest_command == "validate":
                     report = registry.validate_manifest_file(Path(args.path))
+                    _checksums: dict[str, object] = {"implemented": True, "verified": report.checksums_verified}
                     if args.json_output:
                         print(json.dumps({
                             "ok": report.ok,
                             "path": report.path,
                             "errors": report.errors,
                             "warnings": report.warnings,
-                            "signing": _not_impl,
-                            "checksums": _not_impl,
+                            "signing": _signing,
+                            "checksums": _checksums,
                         }))
                         return 0 if report.ok else 1
                     print("Community map manifest validation: OK" if report.ok else "Community map manifest validation: FAILED")
@@ -1527,6 +1528,7 @@ def main(argv: list[str] | None = None) -> int:
                     return 0 if report.ok else 1
                 if args.maps_community_manifest_command == "inspect":
                     report = registry.inspect_manifest_file(Path(args.path))
+                    _checksums = {"implemented": True, "verified": report.checksums_verified}
                     if args.json_output:
                         print(json.dumps({
                             "ok": report.ok,
@@ -1540,8 +1542,8 @@ def main(argv: list[str] | None = None) -> int:
                                 "errors": report.errors,
                                 "warnings": report.warnings,
                             },
-                            "signing": _not_impl,
-                            "checksums": _not_impl,
+                            "signing": _signing,
+                            "checksums": _checksums,
                         }))
                         return 0 if report.ok else 1
                     print("Community map manifest inspect")
@@ -1552,6 +1554,7 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"Author: {report.author_name or '-'}")
                     print(f"Maps: {report.maps_count}")
                     print(f"Validation: {'OK' if report.ok else 'FAILED'}")
+                    print(f"Checksums: {'verified' if report.checksums_verified else 'failed'}")
                     if report.errors:
                         print("")
                         for error in report.errors:

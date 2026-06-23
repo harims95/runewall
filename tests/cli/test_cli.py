@@ -373,7 +373,8 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertEqual(data["errors"], [])
         self.assertFalse(data["signing"]["implemented"])
-        self.assertFalse(data["checksums"]["implemented"])
+        self.assertTrue(data["checksums"]["implemented"])
+        self.assertTrue(data["checksums"]["verified"])
 
     def test_manifest_inspect_example_exits_zero(self) -> None:
         example_path = ROOT / "examples" / "community-maps" / "manifest.example.json"
@@ -388,6 +389,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("Author: example-author", rendered)
         self.assertIn("Maps: 1", rendered)
         self.assertIn("Validation: OK", rendered)
+        self.assertIn("Checksums: verified", rendered)
 
     def test_manifest_inspect_example_json_returns_ok_true(self) -> None:
         example_path = ROOT / "examples" / "community-maps" / "manifest.example.json"
@@ -401,6 +403,8 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["maps_count"], 1)
         self.assertTrue(data["validation"]["ok"])
         self.assertFalse(data["signing"]["implemented"])
+        self.assertTrue(data["checksums"]["implemented"])
+        self.assertTrue(data["checksums"]["verified"])
 
     def test_manifest_validate_missing_file_returns_failure(self) -> None:
         output = io.StringIO()
@@ -499,6 +503,77 @@ class CliTests(unittest.TestCase):
         data = json.loads(output.getvalue())
         self.assertFalse(data["ok"])
         self.assertTrue(any("community_execution_allowed" in e for e in data["errors"]))
+
+    def test_manifest_validate_missing_checksum_returns_failure(self) -> None:
+        import hashlib as _hashlib
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_file = Path(temp_dir) / "mymap.json"
+            map_file.write_text('{"site":"github","flow":"f","action_type":"map.dry_run"}', encoding="utf-8")
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "manifest", "validate", str(path), "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("missing checksum" in e for e in data["errors"]))
+
+    def test_manifest_validate_wrong_checksum_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_file = Path(temp_dir) / "mymap.json"
+            map_file.write_text('{"site":"github","flow":"f","action_type":"map.dry_run"}', encoding="utf-8")
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": "sha256-wrong"},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "manifest", "validate", str(path), "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("checksum mismatch" in e for e in data["errors"]))
+
+    def test_manifest_validate_missing_map_file_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "nothere.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"nothere.json": "sha256-abc"},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "manifest", "validate", str(path), "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("map file not found" in e for e in data["errors"]))
 
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()

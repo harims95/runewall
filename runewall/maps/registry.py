@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from importlib import resources
@@ -82,6 +83,7 @@ class ManifestValidationReport:
     version: str | None = None
     author_name: str | None = None
     maps_count: int = 0
+    checksums_verified: bool = False
 
 
 _VALID_RISK_LEVELS = {"low", "medium", "high"}
@@ -388,6 +390,10 @@ class SiteMapRegistry:
         for secret_key in self._find_manifest_secret_keys(data):
             errors.append(f"secret-like field is not allowed: {secret_key}")
 
+        checksums_verified = self._verify_manifest_checksums(
+            path.parent, maps_list or [], data.get("checksums"), errors
+        )
+
         return ManifestValidationReport(
             ok=not errors,
             path=resolved_path,
@@ -397,6 +403,7 @@ class SiteMapRegistry:
             version=version,
             author_name=author_name,
             maps_count=maps_count,
+            checksums_verified=checksums_verified,
         )
 
     def inspect_manifest_file(self, path: Path) -> ManifestValidationReport:
@@ -461,6 +468,38 @@ class SiteMapRegistry:
                 item_prefix = f"{prefix}[{index}]"
                 matches.extend(self._find_matching_keys(item, patterns, prefix=item_prefix))
         return matches
+
+    def _verify_manifest_checksums(
+        self,
+        manifest_dir: Path,
+        maps_list: list[Any],
+        checksums: Any,
+        errors: list[str],
+    ) -> bool:
+        if not isinstance(checksums, dict):
+            return False
+        all_ok = True
+        for entry in maps_list:
+            if not isinstance(entry, dict):
+                continue
+            map_path_str = entry.get("path")
+            if not isinstance(map_path_str, str) or not map_path_str.strip():
+                continue
+            if map_path_str not in checksums:
+                errors.append(f"missing checksum for {map_path_str}")
+                all_ok = False
+                continue
+            map_file = manifest_dir / map_path_str
+            if not map_file.exists() or not map_file.is_file():
+                errors.append(f"map file not found: {map_path_str}")
+                all_ok = False
+                continue
+            actual = "sha256-" + hashlib.sha256(map_file.read_bytes()).hexdigest()
+            expected = checksums[map_path_str]
+            if actual != expected:
+                errors.append(f"checksum mismatch for {map_path_str}")
+                all_ok = False
+        return all_ok
 
     def _find_manifest_secret_keys(self, data: Any, *, prefix: str = "") -> list[str]:
         """Return key paths matching secret patterns where the value is a non-empty string."""
