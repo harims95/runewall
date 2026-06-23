@@ -26,6 +26,20 @@ The Python SDK is a local-only preview wrapper for calling Runewall safety check
 - no token printing
 - `execute` not exposed
 
+## Result shape
+
+Success:
+
+```python
+{"ok": True, "...": "..."}
+```
+
+Normal validation error:
+
+```python
+{"ok": False, "error": "site is required", "error_code": "missing_site"}
+```
+
 ## Example: policy test
 
 ```python

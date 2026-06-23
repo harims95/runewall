@@ -15,11 +15,19 @@ class SdkTests(unittest.TestCase):
     def test_policy_test_returns_dict(self) -> None:
         result = sdk.policy_test("map.execute")
         self.assertIsInstance(result, dict)
+        self.assertIn("ok", result)
         self.assertEqual(result["action_type"], "map.execute")
+
+    def test_policy_test_empty_returns_missing_action_type(self) -> None:
+        result = sdk.policy_test("")
+        self.assertIsInstance(result, dict)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error_code"], "missing_action_type")
 
     def test_policy_audit_returns_dict(self) -> None:
         result = sdk.policy_audit()
         self.assertIsInstance(result, dict)
+        self.assertIn("ok", result)
         self.assertIn("level", result)
 
     def test_release_check_returns_structured_status(self) -> None:
@@ -31,6 +39,7 @@ class SdkTests(unittest.TestCase):
     def test_mcp_status_returns_supported_tools(self) -> None:
         result = sdk.mcp_status()
         self.assertIsInstance(result, dict)
+        self.assertTrue(result["ok"])
         self.assertIn("mcp", result)
         self.assertIn("supported_tools", result["mcp"])
         self.assertIn("runewall.dry_run", result["mcp"]["supported_tools"])
@@ -40,6 +49,26 @@ class SdkTests(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertEqual(result["site"], "github")
         self.assertEqual(result["flow"], "create_issue")
+
+    def test_dry_run_missing_site_returns_error_code(self) -> None:
+        result = sdk.dry_run("", "create_issue", {})
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error_code"], "missing_site")
+
+    def test_dry_run_missing_flow_returns_error_code(self) -> None:
+        result = sdk.dry_run("github", "", {})
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error_code"], "missing_flow")
+
+    def test_dry_run_invalid_inputs_returns_error_code(self) -> None:
+        result = sdk.dry_run("github", "create_issue", "bad")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error_code"], "invalid_inputs")
+
+    def test_dry_run_unknown_map_returns_structured_error(self) -> None:
+        result = sdk.dry_run("unknown", "missing", {})
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error_code"], "map_not_found")
 
     def test_sdk_has_no_execute_function(self) -> None:
         self.assertFalse(hasattr(sdk, "execute"))
