@@ -86,6 +86,64 @@ MCP_LATER_TOOLS = (
     "runewall.rollback",
     "runewall.log",
 )
+MCP_TOOL_DEFINITIONS = (
+    {
+        "name": "runewall.policy_test",
+        "description": "Explain the policy decision for a Runewall action type.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "action_type": {"type": "string"},
+            },
+            "required": ["action_type"],
+        },
+    },
+    {
+        "name": "runewall.policy_audit",
+        "description": "Audit current Runewall policy and config safety posture.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "runewall.dry_run",
+        "description": "Preview a Runewall action without calling external APIs.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "site": {"type": "string"},
+                "flow": {"type": "string"},
+                "inputs": {"type": "object"},
+            },
+            "required": ["site", "flow"],
+        },
+    },
+    {
+        "name": "runewall.release_check",
+        "description": "Run local release readiness checks.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "runewall.doctor",
+        "description": "Run local Runewall health checks.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "runewall.maps_list",
+        "description": "List available Runewall action maps.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "runewall.maps_show",
+        "description": "Show details for a Runewall action map.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "site": {"type": "string"},
+                "flow": {"type": "string"},
+            },
+            "required": ["site", "flow"],
+        },
+    },
+)
 RUNEWALL_VERSION = "0.2.0"
 
 
@@ -204,6 +262,46 @@ def _release_json_check_report(root: Path) -> dict[str, object]:
     return report
 
 
+def _jsonrpc_response(message_id: object, *, result: dict[str, object] | None = None, error: dict[str, object] | None = None) -> dict[str, object]:
+    response: dict[str, object] = {"jsonrpc": "2.0", "id": message_id}
+    if error is not None:
+        response["error"] = error
+    else:
+        response["result"] = result if result is not None else {}
+    return response
+
+
+def _mcp_once_response(raw_message: str) -> dict[str, object]:
+    try:
+        request = json.loads(raw_message)
+    except json.JSONDecodeError:
+        return _jsonrpc_response(None, error={"code": -32700, "message": "Parse error"})
+
+    if not isinstance(request, dict) or not isinstance(request.get("method"), str):
+        return _jsonrpc_response(request.get("id") if isinstance(request, dict) else None, error={"code": -32600, "message": "Invalid Request"})
+
+    message_id = request.get("id")
+    method = request["method"]
+
+    if method == "initialize":
+        return _jsonrpc_response(
+            message_id,
+            result={
+                "protocolVersion": "2025-06-18",
+                "serverInfo": {
+                    "name": "runewall",
+                    "version": RUNEWALL_VERSION,
+                },
+                "capabilities": {
+                    "tools": {},
+                },
+            },
+        )
+    if method == "tools/list":
+        return _jsonrpc_response(message_id, result={"tools": list(MCP_TOOL_DEFINITIONS)})
+    return _jsonrpc_response(message_id, error={"code": -32601, "message": "Method not found"})
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="runewall",
@@ -320,6 +418,8 @@ def build_parser() -> argparse.ArgumentParser:
     mcp_subcommands = mcp_parser.add_subparsers(dest="mcp_command", required=True)
     mcp_tools_parser = mcp_subcommands.add_parser("tools", help="List planned MCP tools.")
     mcp_tools_parser.add_argument("--json", action="store_true", dest="json_output")
+    mcp_serve_parser = mcp_subcommands.add_parser("serve", help="Run a local MCP stdio skeleton.")
+    mcp_serve_parser.add_argument("--once", action="store_true")
     policy_parser = subcommands.add_parser(
         "policy",
         help="Explain, test, list, and audit safety policies.",
@@ -439,6 +539,12 @@ def main(argv: list[str] | None = None) -> int:
             print("Later:")
             for tool in MCP_LATER_TOOLS:
                 print(f"- {tool}")
+            return 0
+        if args.mcp_command == "serve":
+            if not args.once:
+                print("Use `runewall mcp serve --once` for the local MCP stdio skeleton.")
+                return 1
+            print(json.dumps(_mcp_once_response(sys.stdin.read())))
             return 0
     if args.command == "config":
         if args.config_command == "path":

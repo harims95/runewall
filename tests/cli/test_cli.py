@@ -55,6 +55,69 @@ class CliTests(unittest.TestCase):
         self.assertIn("runewall.dry_run", data["initial_tools"])
         self.assertIn("runewall.release_check", data["initial_tools"])
 
+    def test_mcp_serve_once_handles_initialize(self) -> None:
+        output = io.StringIO()
+        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}')):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["jsonrpc"], "2.0")
+        self.assertEqual(data["id"], 1)
+        self.assertEqual(data["result"]["protocolVersion"], "2025-06-18")
+        self.assertEqual(data["result"]["serverInfo"]["name"], "runewall")
+        self.assertEqual(data["result"]["serverInfo"]["version"], "0.2.0")
+
+    def test_mcp_serve_once_handles_tools_list(self) -> None:
+        output = io.StringIO()
+        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}')):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["jsonrpc"], "2.0")
+        self.assertEqual(data["id"], 2)
+        names = [tool["name"] for tool in data["result"]["tools"]]
+        self.assertIn("runewall.policy_test", names)
+        self.assertIn("runewall.dry_run", names)
+        self.assertIn("runewall.release_check", names)
+
+    def test_mcp_serve_once_unknown_method_returns_method_not_found(self) -> None:
+        output = io.StringIO()
+        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":3,"method":"unknown","params":{}}')):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["id"], 3)
+        self.assertEqual(data["error"]["code"], -32601)
+        self.assertEqual(data["error"]["message"], "Method not found")
+
+    def test_mcp_serve_once_invalid_json_returns_parse_error(self) -> None:
+        output = io.StringIO()
+        with patch("sys.stdin", io.StringIO("{invalid json")):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertIsNone(data["id"])
+        self.assertEqual(data["error"]["code"], -32700)
+
+    def test_mcp_serve_once_missing_method_returns_invalid_request(self) -> None:
+        output = io.StringIO()
+        with patch("sys.stdin", io.StringIO('{"jsonrpc":"2.0","id":4,"params":{}}')):
+            with redirect_stdout(output):
+                exit_code = main(["mcp", "serve", "--once"])
+        self.assertEqual(exit_code, 0)
+        import json as _json
+        data = _json.loads(output.getvalue())
+        self.assertEqual(data["id"], 4)
+        self.assertEqual(data["error"]["code"], -32600)
+
     def test_policy_help_exits_zero_and_mentions_audit(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
