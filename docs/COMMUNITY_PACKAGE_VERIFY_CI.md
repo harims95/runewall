@@ -24,6 +24,8 @@
 runewall maps community package verify examples/community-maps --json
 ```
 
+This returns machine-readable JSON and does not import or execute the package.
+
 ## PowerShell fail-fast example
 
 ```powershell
@@ -81,3 +83,5 @@ jobs:
 ## Safety note
 
 Even if package verify passes, community map execution remains disabled.
+
+Use package verify as a review gate before `package import`, not as an execution approval step.

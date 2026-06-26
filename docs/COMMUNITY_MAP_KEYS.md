@@ -4,15 +4,15 @@ Runewall has a local trusted key store for explicit trust decisions. Runewall do
 
 ## 1. Purpose
 
-The local trusted key store will let users explicitly trust publisher public keys for future community map signature verification.
+The local trusted key store lets users explicitly trust publisher public keys for future community map signature verification.
 
 ## 2. Current status
 
-- Local trusted key store is implemented for `keys status`, `keys list`, `keys inspect`, `keys trust`, and `keys revoke`.
-- Runewall does not yet verify signatures.
-- Runewall does verify local SHA-256 checksums for manifest-listed map files.
-- See [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the signing design.
-- See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the implemented checksum verification.
+- local trusted key store is implemented for `keys status`, `keys list`, `keys inspect`, `keys trust`, and `keys revoke`
+- Runewall does not yet verify signatures
+- Runewall does verify local SHA-256 checksums for manifest-listed map files
+- see [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the signing design
+- see [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the implemented checksum verification
 
 ## 3. Safety principles
 
@@ -20,15 +20,16 @@ The local trusted key store will let users explicitly trust publisher public key
 - trust must be local
 - no automatic remote key trust
 - no private keys in packages
-- no private keys in Runewall key store
+- no private keys in the Runewall key store
+- trusted keys do not enable execution
 - signing must not imply execution
 - community map execution remains disabled
 
 ## 4. Local storage path
 
-Trusted keys would be stored at:
+Trusted keys are stored at:
 
-```
+```text
 .runewall/trusted-keys/
 ```
 
@@ -47,11 +48,13 @@ One JSON file per trusted key, keyed by `key_id`.
 }
 ```
 
-`status` may be `"trusted"` or `"revoked"`. A revoked key should fail signature verification.
+`status` may be `"trusted"` or `"revoked"`. A revoked key should fail future signature verification.
 
 ## 6. Commands
 
-```
+All trusted key commands are local-only.
+
+```bash
 runewall maps community keys status
 runewall maps community keys status --json
 runewall maps community keys list
@@ -67,21 +70,15 @@ runewall maps community keys revoke <key-id> --reason "reason"
 runewall maps community keys revoke <key-id> --json --reason "reason"
 ```
 
-`keys status` — shows the key store mode, storage path, implemented features, and safety posture.
+`keys status` shows the key store mode, storage path, implemented features, and safety posture.
 
-`keys list` — reads local key records from `.runewall/trusted-keys/` and lists key ids, algorithms, and status. Returns an empty list if the folder does not exist. Invalid key records produce a warning and are skipped.
+`keys list` reads local key records from `.runewall/trusted-keys/` and lists key ids, algorithms, and status.
 
-`keys inspect <key-id>` — finds and shows details for a single key record by key id. Does not include the public key in output. Returns `key_not_found` if the key id is not in the local store.
+`keys inspect <key-id>` shows details for a single local key record without printing the public key.
 
-`keys trust <key-file>` — validates a local JSON key file and stores it as a trusted key record under `.runewall/trusted-keys/<key_id>.json`. Adds `trusted_at` timestamp and `status: trusted`. Trust is local-only and explicit. Trusting a key does not enable signature verification and does not enable community map execution.
+`keys trust <key-file>` validates a local JSON key file and stores it under `.runewall/trusted-keys/<key_id>.json`. Trust is local-only and does not enable signature verification or community map execution.
 
-Required key file fields: `key_id`, `algorithm`, `public_key`. Optional: `source` (defaults to `local-file`). Supported algorithms: `ed25519`. Fields with secret-like names (`private_key`, `token`, `api_key`, `secret`, `password`) are rejected.
-
-Use `--force` to overwrite an existing trusted key record. Without `--force`, trusting an already-trusted key id returns `key_already_exists`.
-
-See `examples/community-maps/keys/example-author-key.json` for an example key file.
-
-`keys revoke <key-id>` — local-only revoke. It does not delete the key record. Instead, it updates the stored record with `status: revoked`, adds `revoked_at`, and stores `revocation_reason` using either the provided `--reason` value or `user_requested`. Revoke does not enable or disable community map execution.
+`keys revoke <key-id>` is local-only revoke. It does not delete the key record. Instead, it updates the stored record with `status: revoked`, adds `revoked_at`, and stores `revocation_reason`. Revoke does not enable or disable community map execution.
 
 ## 7. Key rotation policy
 
@@ -104,11 +101,11 @@ See `examples/community-maps/keys/example-author-key.json` for an example key fi
 
 ### Purpose
 
-Revoking a trusted key should let a user locally mark a publisher key as no longer trusted, so future signature verification against that key fails.
+Revoking a trusted key lets a user locally mark a publisher key as no longer trusted, so future signature verification against that key fails.
 
 ### Safety rule
 
-Revocation is local-only. Runewall must not depend on remote revocation lists yet. Remote revocation discovery is future work.
+Revocation is local-only. Runewall must not depend on remote revocation lists yet.
 
 ### Revoked key record behavior
 
@@ -129,17 +126,10 @@ A revoked key record sets `"status": "revoked"` and may include optional fields:
 
 ### Implemented behavior
 
-- revoked keys should still appear in `keys list` with `status: revoked`
-- `keys inspect` should show `status: revoked`
+- revoked keys still appear in `keys list` with `status: revoked`
+- `keys inspect` shows `status: revoked`
 - future signature verification should fail for revoked keys
-- revocation should not delete the key record by default
+- revocation does not delete the key record
 - private keys must never be stored
-- revocation must not enable or disable community map execution
-
-### Out of scope
-
-- remote revocation lists
-- automatic revocation syncing
-- hosted key transparency
-- signature verification
-- community map execution
+- trusted keys do not enable community map execution
+- revocation does not enable or disable community map execution

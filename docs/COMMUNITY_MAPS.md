@@ -42,9 +42,11 @@ v0.5 community maps are local-only and non-executable.
    `runewall maps community validate examples/community-maps/github_create_issue.safe.json`
 2. Inspect the bundled example:
    `runewall maps community inspect examples/community-maps/github_create_issue.safe.json`
-3. Import the validated example locally:
-   `runewall maps community import examples/community-maps/github_create_issue.safe.json`
-4. List imported maps:
+3. Verify the bundled example package before import:
+   `runewall maps community package verify examples/community-maps`
+4. Import the validated example locally:
+   `runewall maps community package import examples/community-maps`
+5. List imported maps:
    `runewall maps community list`
 
 ## Manifest validation
@@ -72,6 +74,7 @@ See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the manifest
 - Verifies local SHA-256 checksums.
 - Reports signing status.
 - Reports trusted key status if the manifest includes a future `signing.public_key_id`.
+- Is the recommended gate before `package import`.
 - Does not import or execute anything.
 
 ## Package verify JSON contract
@@ -106,6 +109,14 @@ See [docs/COMMUNITY_PACKAGE_VERIFY_CI.md](COMMUNITY_PACKAGE_VERIFY_CI.md) for Po
 - Does not import the manifest itself as an executable map.
 - Does not execute anything. Imported community maps remain non-executable.
 
+## Recommended flow
+
+Use this local-first community map flow:
+
+`validate -> inspect -> package verify -> package import -> list`
+
+`package verify` is the recommended gate before import. Imported community maps remain non-executable, and remote registry or download support is still future work.
+
 ## Signing status
 
 `runewall maps community signing status` shows which signing features are implemented and which are future work.
@@ -122,7 +133,7 @@ A future local trusted key store (design in v0.6.3) will let users explicitly tr
 
 `runewall maps community keys status` shows the key store mode, storage path, and safety posture.
 
-Key revocation (`keys revoke`) is design-only. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the revoke design.
+Key revocation (`keys revoke`) is local-only. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the trusted key model and revoke behavior.
 
 ## Commands
 

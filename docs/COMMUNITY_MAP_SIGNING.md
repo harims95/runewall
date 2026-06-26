@@ -1,6 +1,6 @@
 # Community Map Signing
 
-Design document only. Not implemented in v0.6.
+Design document only. Signing is not implemented yet.
 
 SHA-256 checksum verification is implemented. Signature verification is future work.
 
@@ -10,9 +10,11 @@ Community map signing is intended to help users verify that a map package came f
 
 ## 2. Current status
 
-- Signing is design-only. Runewall does not yet verify signatures.
-- Runewall does verify local SHA-256 checksums for manifest-listed map files.
-- See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the implemented checksum verification.
+- signing is design-only
+- Runewall does not yet verify signatures
+- Runewall does verify local SHA-256 checksums for manifest-listed map files
+- `runewall maps community package verify` reports signing status only
+- see [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the implemented checksum verification
 
 ## 3. Signing goals
 
@@ -46,7 +48,7 @@ A future manifest may include a `signing` block:
 }
 ```
 
-The `signed_fields` list defines which manifest fields are covered by the signature. `checksums` is always included, so a valid signature also transitively covers the map file contents.
+The `signed_fields` list defines which manifest fields are covered by the signature. `checksums` is always included, so a valid signature would also transitively cover the map file contents.
 
 ## 5. Key policy
 
@@ -55,41 +57,22 @@ The `signed_fields` list defines which manifest fields are covered by the signat
 - Runewall should not auto-trust remote keys
 - trust should be explicit and local
 - key rotation should be supported later
-- revoked keys should fail signature verification — a key with `status: revoked` must not pass future verification even if the signature itself is cryptographically valid
+- revoked keys should fail future signature verification
 
-The local trusted key store is design-only. See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the proposed key store design, storage path, key record format, and key commands.
-
-`runewall maps community keys status` is implemented and shows the key store mode, safety posture, and which key operations are available.
+See [docs/COMMUNITY_MAP_KEYS.md](COMMUNITY_MAP_KEYS.md) for the local trusted key model.
 
 ## 6. Commands
 
-`signing status` is implemented. All other signing commands are future work.
+`signing status` is implemented. All other signing behavior is future work.
 
-```
+```bash
 runewall maps community signing status
 runewall maps community signing status --json
 ```
 
-`signing status` — shows which signing features are implemented and which are future work. Checksum verification is implemented; signature generation and verification are not yet implemented.
+`signing status` shows which signing features are implemented and which are future work.
 
 `package verify` reports signing status for a local package and may report trusted key status from the local key store when a manifest includes `signing.public_key_id`, but it does not verify cryptographic signatures yet.
-
-Future (not yet implemented):
-
-```
-runewall maps community verify <path>
-runewall maps community keys list
-runewall maps community keys trust <key-file>
-runewall maps community keys revoke <key-id>
-```
-
-`verify` — validate a package manifest and verify its signature against a locally trusted key.
-
-`keys list` — list locally trusted public keys.
-
-`keys trust <key-file>` — add a public key to the local trust store.
-
-`keys revoke <key-id>` — remove a key from the local trust store.
 
 ## 7. Out of scope
 
@@ -102,4 +85,4 @@ runewall maps community keys revoke <key-id>
 
 ## 8. Safety stance
 
-Even signed maps should remain dry-run first. A valid signature should not automatically mean execution is allowed. Execution policy must remain separate from package trust.
+Even signed maps should remain dry-run first. A valid signature should not automatically mean execution is allowed. Signing must not imply execution.

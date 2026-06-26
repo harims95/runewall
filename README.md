@@ -111,6 +111,19 @@ runewall doctor
 
 Dry-run works without tokens. Tokens are only needed for real execution maps.
 
+## Community package verify
+
+Use community package verify as the recommended local gate before community map import or review.
+
+```bash
+runewall maps community package verify examples/community-maps
+runewall maps community package verify examples/community-maps --json
+```
+
+Verify checks manifest validation, SHA-256 checksums, signing status, trusted key status, and execution safety posture.
+
+Verify does not import maps, execute maps, download remote files, or call external APIs.
+
 ## v0.2 release readiness
 
 Use this checklist before tagging or sharing a release candidate:

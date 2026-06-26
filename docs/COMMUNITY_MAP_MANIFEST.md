@@ -1,16 +1,16 @@
 # Community Map Manifest
 
-Design document only. Not implemented in v0.5.
+Manifest validation and SHA-256 checksum verification are implemented. Signature verification is future work.
 
 ## 1. Purpose
 
-A community map manifest describes a local/community action map package before it is trusted, installed, or executed.
+A community map manifest describes a local/community action map package before it is trusted, imported, or reviewed.
 
 The manifest is a single JSON file that travels with one or more community map files and declares their identity, permissions, safety posture, and file checksums.
 
 ## 2. Why manifests matter
 
-Before Runewall supports remote registries or map downloads, each community map package needs metadata that can later support:
+Before Runewall supports remote registries or map downloads, each community map package needs metadata that supports:
 
 - validation
 - signing
@@ -18,7 +18,7 @@ Before Runewall supports remote registries or map downloads, each community map 
 - provenance
 - safety review
 
-A manifest makes these future capabilities possible without changing the map file format itself.
+A manifest makes these capabilities possible without changing the map file format itself.
 
 ## 3. Proposed manifest fields
 
@@ -84,42 +84,34 @@ See [examples/community-maps/manifest.example.json](../examples/community-maps/m
 - SHA-256 checksum verification is implemented: map files are read and hashed against `checksums` entries
 - checksum mismatch, missing checksum, or missing map file fails validation
 - remote downloads are future work
-- signed verification is future work
+- signature verification is future work
 
 ## 5. Commands
 
-`manifest validate` and `manifest inspect` are implemented in v0.5.1.
+`manifest validate`, `manifest inspect`, `package inspect`, `package verify`, and `package import` are implemented.
 
-```
+```bash
 runewall maps community manifest validate <path>
 runewall maps community manifest validate <path> --json
 runewall maps community manifest inspect <path>
 runewall maps community manifest inspect <path> --json
 ```
 
-`manifest validate` — parse and check required fields, safety flags, and verify local SHA-256 checksums. Signing verification is not yet implemented.
+`manifest validate` parses required fields, checks safety flags, and verifies local SHA-256 checksums.
 
-`manifest inspect` — report manifest metadata (name, version, author, maps count, validation result, checksum status) without importing or executing anything.
+`manifest inspect` reports manifest metadata without importing or executing anything.
 
-`package inspect` — inspect a local package directory. Finds `manifest.json` or `manifest.example.json`, runs manifest validation and checksum verification, and reports the full safety posture. Does not import or execute.
+`package inspect` finds `manifest.json` or `manifest.example.json`, runs manifest validation plus checksum verification, and reports package metadata and safety posture.
 
-`package verify` — verify a local package directory. Finds `manifest.json` or `manifest.example.json`, runs manifest validation and checksum verification, reports signing status, and reports trusted key status if `signing.public_key_id` is present. Does not import or execute.
+`package verify` finds `manifest.json` or `manifest.example.json`, runs manifest validation plus checksum verification, reports signing status, and reports trusted key status if `signing.public_key_id` is present. It does not import or execute.
 
-`package import` — validate, verify checksums, then copy map files from the package directory into `.runewall/community-maps/`. Nothing is copied if validation or checksum verification fails. Imported maps remain non-executable.
-
-Future (not yet implemented):
-
-```
-runewall maps community verify <path>
-```
-
-`verify` — compare declared checksums against actual file hashes (requires checksum implementation).
+`package import` validates the manifest, verifies checksums, and then copies listed map files into `.runewall/community-maps/`. Imported maps remain non-executable.
 
 ## 6. Future signing
 
 SHA-256 checksum verification is implemented. Signature verification is not yet implemented.
 
-A future `signing` block in the manifest will allow publishers to sign the manifest fields, giving users a way to verify provenance and detect tampering.
+A future `signing` block in the manifest will allow publishers to sign manifest fields for provenance and tamper detection.
 
 See [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the proposed signing model, key policy, and future commands.
 

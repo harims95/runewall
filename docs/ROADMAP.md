@@ -38,10 +38,19 @@
 
 - local trusted key store design (docs/COMMUNITY_MAP_KEYS.md)
 
+## v0.7.0
+
+- community package verify
+
+## v0.7.x
+
+- package verify JSON contract
+- package verify CI examples
+- package verify docs polish
+
 ## Future
 
-- local signature verification
-- key status/list/trust/revoke commands
+- real signature verification
 - stronger approval UX
 - local dashboard
 - browser automation
