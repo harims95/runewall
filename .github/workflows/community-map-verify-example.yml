@@ -1,0 +1,18 @@
+# Example workflow for local community map package verification.
+# This is a documentation-style example and can be adapted per repository.
+name: Community Map Verify Example
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  verify-community-maps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e ".[dev]"
+      - run: runewall maps community package verify examples/community-maps --json

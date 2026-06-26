@@ -88,6 +88,12 @@ Main keys:
 - `trusted_key`
 - `safety`
 
+## Package verify in CI
+
+`runewall maps community package verify <directory> --json` can be used in local scripts, agent workflows, and CI before package import or human review.
+
+See [docs/COMMUNITY_PACKAGE_VERIFY_CI.md](COMMUNITY_PACKAGE_VERIFY_CI.md) for PowerShell, Python, and GitHub Actions examples.
+
 ## Package import
 
 `runewall maps community package import <directory>` imports map files from a local community map package.
