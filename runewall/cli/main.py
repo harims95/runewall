@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import sys
 
 from runewall.core.config import config_path, CONFIG_PROFILES, ensure_config, format_config_data, load_config, load_config_data, RESET_CONFIG_TEXT, safe_config_dict, set_config_value, validate_config_data
@@ -461,6 +462,58 @@ def _package_status_result(root: Path) -> dict[str, object]:
     }
 
 
+def _pyproject_text(root: Path) -> str:
+    pyproject_path = root / "pyproject.toml"
+    if not pyproject_path.exists():
+        return ""
+    return pyproject_path.read_text(encoding="utf-8")
+
+
+def _pyproject_version_value(pyproject_text: str) -> str | None:
+    match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', pyproject_text)
+    if match is None:
+        return None
+    return match.group(1)
+
+
+def _pyproject_has_license_metadata(pyproject_text: str) -> bool:
+    return re.search(r"(?m)^license\s*=", pyproject_text) is not None
+
+
+def _pyproject_console_script_name(pyproject_text: str) -> str | None:
+    match = re.search(r"(?ms)^\[project\.scripts\]\s+runewall\s*=\s*\"[^\"]+\"", pyproject_text)
+    if match is None:
+        return None
+    return "runewall"
+
+
+def _package_build_check_result(root: Path) -> dict[str, object]:
+    pyproject_path = root / "pyproject.toml"
+    pyproject_text = _pyproject_text(root)
+    readme_path = root / "README.md"
+    license_present = any((root / name).exists() for name in ("LICENSE", "LICENSE.txt", "LICENSE.md"))
+    license_metadata_present = _pyproject_has_license_metadata(pyproject_text)
+    version_value = _pyproject_version_value(pyproject_text)
+    console_script_name = _pyproject_console_script_name(pyproject_text)
+
+    checks = {
+        "pyproject": {"ok": pyproject_path.exists()},
+        "readme": {"ok": readme_path.exists()},
+        "license": {"ok": license_present or license_metadata_present},
+        "package_dir": {"ok": (root / "runewall").is_dir()},
+        "console_script": {"ok": console_script_name is not None, "name": console_script_name},
+        "version": {"ok": version_value is not None, "value": version_value},
+        "install_docs": {"ok": (root / "docs" / "INSTALL.md").exists()},
+        "tests": {"ok": (root / "tests").is_dir()},
+    }
+    errors = [name for name, check in checks.items() if not check["ok"]]
+    return {
+        "ok": not errors,
+        "checks": checks,
+        "errors": errors,
+    }
+
+
 def _community_maps_human_label(value: str) -> str:
     return value.replace("_", " ")
 
@@ -909,6 +962,8 @@ def build_parser() -> argparse.ArgumentParser:
     package_subcommands = package_parser.add_subparsers(dest="package_command", required=True)
     package_status_parser = package_subcommands.add_parser("status", help="Show local package status.")
     package_status_parser.add_argument("--json", action="store_true", dest="json_output")
+    package_build_check_parser = package_subcommands.add_parser("build-check", help="Check local package build readiness.")
+    package_build_check_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser(
         "doctor",
         help="Check local runtime health.",
@@ -2255,26 +2310,45 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Runewall {ver}")
         return 0
     if args.command == "package":
-        report = _package_status_result(Path.cwd())
+        if args.package_command == "status":
+            report = _package_status_result(Path.cwd())
+            if args.json_output:
+                print(json.dumps(report))
+                return 0
+            package = report["package"]
+            print("Package status")
+            print()
+            print("Install mode:")
+            print("- local editable supported")
+            print()
+            print("PyPI:")
+            print("- not published yet")
+            print()
+            print("Checks:")
+            print(f"- console script: {package['console_script']}")
+            print(f"- Python package: {package['python_package']}")
+            print(f"- README: {'present' if package['readme_present'] else 'missing'}")
+            print(f"- license: {'present' if package['license_present'] else 'missing'}")
+            print("- tests: run with python -m pytest tests -v")
+            return 0
+        report = _package_build_check_result(Path.cwd())
         if args.json_output:
             print(json.dumps(report))
-            return 0
-        package = report["package"]
-        print("Package status")
-        print()
-        print("Install mode:")
-        print("- local editable supported")
-        print()
-        print("PyPI:")
-        print("- not published yet")
+            return 0 if report["ok"] else 1
+        print("Package build check")
         print()
         print("Checks:")
-        print(f"- console script: {package['console_script']}")
-        print(f"- Python package: {package['python_package']}")
-        print(f"- README: {'present' if package['readme_present'] else 'missing'}")
-        print(f"- license: {'present' if package['license_present'] else 'missing'}")
-        print("- tests: run with python -m pytest tests -v")
-        return 0
+        print(f"- pyproject.toml: {'OK' if report['checks']['pyproject']['ok'] else 'MISSING'}")
+        print(f"- README: {'OK' if report['checks']['readme']['ok'] else 'MISSING'}")
+        print(f"- license: {'OK' if report['checks']['license']['ok'] else 'MISSING'}")
+        print(f"- package directory: {'OK' if report['checks']['package_dir']['ok'] else 'MISSING'}")
+        print(f"- console script: {'OK' if report['checks']['console_script']['ok'] else 'MISSING'}")
+        print(f"- version: {'OK' if report['checks']['version']['ok'] else 'MISSING'}")
+        print(f"- install docs: {'OK' if report['checks']['install_docs']['ok'] else 'MISSING'}")
+        print(f"- tests: {'OK' if report['checks']['tests']['ok'] else 'MISSING'}")
+        print()
+        print(f"Result: {'OK' if report['ok'] else 'FAILED'}")
+        return 0 if report["ok"] else 1
     if args.command == "doctor":
         report = _doctor_result(Path.cwd())
         cfg = load_config(Path.cwd())

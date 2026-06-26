@@ -124,6 +124,31 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["package"]["console_script"], "runewall")
         self.assertEqual(data["package"]["python_package"], "runewall")
 
+    def test_package_build_check_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["package", "build-check"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Package build check", rendered)
+        self.assertIn("- pyproject.toml: OK", rendered)
+        self.assertIn("- console script: OK", rendered)
+        self.assertIn("- version: OK", rendered)
+        self.assertIn("Result: OK", rendered)
+
+    def test_package_build_check_json_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["package", "build-check", "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertIn("pyproject", data["checks"])
+        self.assertIn("console_script", data["checks"])
+        self.assertIn("version", data["checks"])
+        self.assertEqual(data["checks"]["console_script"]["name"], "runewall")
+        self.assertEqual(data["checks"]["version"]["value"], "0.8.0")
+
     def test_community_maps_status_exits_zero(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

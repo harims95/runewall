@@ -14,3 +14,12 @@
 - stronger agent integration examples
 - MCP/SDK approve-execute lifecycle
 - packaging/PyPI polish
+
+## v0.8.2
+
+- build artifact readiness check
+
+## Future
+
+- actual build artifacts
+- PyPI publish

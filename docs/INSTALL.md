@@ -57,6 +57,8 @@ runewall release check
 python -m pytest tests -v
 runewall package status
 runewall package status --json
+runewall package build-check
+runewall package build-check --json
 ```
 
 ## Safe first commands
