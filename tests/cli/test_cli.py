@@ -2252,13 +2252,20 @@ class CliTests(unittest.TestCase):
         mocked_execute.assert_not_called()
 
     def test_act_dry_run_json_for_linear_create_issue(self) -> None:
-        output = io.StringIO()
-        with redirect_stdout(output):
-            exit_code = main([
-                "act", "linear", "create_issue", "--dry-run", "--json",
-                "--input", "team_id=team123",
-                "--input", "title=Bug report",
-            ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "linear", "create_issue", "--dry-run", "--json",
+                        "--input", "team_id=team123",
+                        "--input", "title=Bug report",
+                    ])
+            finally:
+                os.chdir(original_cwd)
         self.assertEqual(exit_code, 0)
         import json as _json
         data = _json.loads(output.getvalue())
@@ -5081,14 +5088,21 @@ class CliTests(unittest.TestCase):
 
 
     def test_act_dry_run_json_success_prints_valid_json(self) -> None:
-        output = io.StringIO()
-        with redirect_stdout(output):
-            exit_code = main([
-                "act", "github", "create_issue", "--dry-run", "--json",
-                "--input", "repo=user/repo",
-                "--input", "title=Bug",
-                "--input", "body=Details",
-            ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "github", "create_issue", "--dry-run", "--json",
+                        "--input", "repo=user/repo",
+                        "--input", "title=Bug",
+                        "--input", "body=Details",
+                    ])
+            finally:
+                os.chdir(original_cwd)
         self.assertEqual(exit_code, 0)
         import json as _json
         data = _json.loads(output.getvalue())
@@ -5108,13 +5122,20 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["policy_reason"], 'rules.map_dry_run = "auto"')
 
     def test_act_dry_run_human_output_includes_policy_details(self) -> None:
-        output = io.StringIO()
-        with redirect_stdout(output):
-            exit_code = main([
-                "act", "github", "create_issue", "--dry-run",
-                "--input", "repo=user/repo",
-                "--input", "title=Bug",
-            ])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            try:
+                os.chdir(temp_dir)
+                main(["config", "profile", "safe"])
+                with redirect_stdout(output):
+                    exit_code = main([
+                        "act", "github", "create_issue", "--dry-run",
+                        "--input", "repo=user/repo",
+                        "--input", "title=Bug",
+                    ])
+            finally:
+                os.chdir(original_cwd)
         rendered = output.getvalue()
         self.assertEqual(exit_code, 0)
         self.assertIn("Policy: auto", rendered)

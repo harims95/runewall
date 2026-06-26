@@ -876,9 +876,16 @@ class SiteMapRegistry:
                 errors.append(f"map file not found: {map_path_str}")
                 all_ok = False
                 continue
-            actual = "sha256-" + hashlib.sha256(map_file.read_bytes()).hexdigest()
+            actual = hashlib.sha256(map_file.read_bytes()).hexdigest().lower()
             expected = checksums[map_path_str]
-            if actual != expected:
+            if not isinstance(expected, str):
+                errors.append(f"checksum mismatch for {map_path_str}")
+                all_ok = False
+                continue
+            normalized_expected = expected.strip().lower()
+            if normalized_expected.startswith("sha256-"):
+                normalized_expected = normalized_expected[len("sha256-") :]
+            if actual != normalized_expected:
                 errors.append(f"checksum mismatch for {map_path_str}")
                 all_ok = False
         return all_ok

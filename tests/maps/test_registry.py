@@ -415,6 +415,30 @@ class SiteMapRegistryTests(unittest.TestCase):
             map_content = b'{"site":"github","flow":"f","action_type":"map.dry_run"}'
             map_file = Path(temp_dir) / "x.json"
             map_file.write_bytes(map_content)
+            checksum = _hashlib.sha256(map_content).hexdigest()
+            path = Path(temp_dir) / "manifest.json"
+            path.write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "x.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "requires_tokens": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"x.json": checksum},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.validate_manifest_file(path)
+        self.assertTrue(report.ok, report.errors)
+        self.assertTrue(report.checksums_verified)
+
+    def test_validate_manifest_file_passes_with_sha256_prefixed_checksum(self) -> None:
+        import hashlib as _hashlib
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            map_content = b'{"site":"github","flow":"f","action_type":"map.dry_run"}'
+            map_file = Path(temp_dir) / "x.json"
+            map_file.write_bytes(map_content)
             checksum = "sha256-" + _hashlib.sha256(map_content).hexdigest()
             path = Path(temp_dir) / "manifest.json"
             path.write_text(
