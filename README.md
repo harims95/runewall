@@ -171,6 +171,7 @@ Verify does not import maps, execute maps, download remote files, or call extern
 - [docs/INSTALL.md](docs/INSTALL.md)
 - [docs/PACKAGING.md](docs/PACKAGING.md)
 - [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- [docs/POLICIES.md](docs/POLICIES.md)
 - [docs/ROADMAP.md](docs/ROADMAP.md)
 - [demos/README.md](demos/README.md)
 - [docs/COMMUNITY_MAPS.md](docs/COMMUNITY_MAPS.md)
