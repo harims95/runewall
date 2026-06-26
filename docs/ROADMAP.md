@@ -38,6 +38,7 @@
 ## Next
 
 - v0.9.0 public packaging and release readiness
+- local build artifact verification
 
 ## Future
 

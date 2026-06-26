@@ -14,22 +14,39 @@
 runewall package status
 runewall package build-check
 runewall package pypi-check
+runewall package dist-check
 python -m pytest tests -v
 ```
 
-## Local artifact build
+## Build artifacts locally
 
-Optional local build commands:
+Use these local-only commands:
 
 ```powershell
-python -m pip install build
+python -m pip install build twine
 python -m build
+python -m twine check dist/*
 ```
+
+- `python -m build` creates a wheel and sdist in `dist/`
+- `python -m twine check dist/*` validates package metadata and README rendering
+- this does not publish anything
+- do not run `twine upload` yet
 
 This creates:
 
 - `dist/*.whl`
 - `dist/*.tar.gz`
+
+## Dist verification checklist
+
+- `dist/` folder exists
+- wheel exists
+- sdist exists
+- `python -m twine check dist/*` passes
+- version matches `runewall version`
+- tests pass before build
+- GitHub release should exist before publishing
 
 ## Install local wheel example
 

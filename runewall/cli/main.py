@@ -556,6 +556,26 @@ def _package_pypi_check_result(root: Path) -> dict[str, object]:
     }
 
 
+def _package_dist_check_result(root: Path) -> dict[str, object]:
+    pyproject_text = _pyproject_text(root)
+    version_value = _pyproject_version_value(pyproject_text)
+    dist_dir = root / "dist"
+    wheel_files = sorted(path.name for path in dist_dir.glob("*.whl")) if dist_dir.is_dir() else []
+    sdist_files = sorted(path.name for path in dist_dir.glob("*.tar.gz")) if dist_dir.is_dir() else []
+    checks = {
+        "dist_dir": {"ok": dist_dir.is_dir()},
+        "wheel": {"ok": bool(wheel_files), "files": wheel_files},
+        "sdist": {"ok": bool(sdist_files), "files": sdist_files},
+        "pyproject": {"ok": (root / "pyproject.toml").exists()},
+        "version": {"ok": version_value is not None, "value": version_value},
+    }
+    return {
+        "ok": all(check["ok"] for check in checks.values()),
+        "checks": checks,
+        "publish_performed": False,
+    }
+
+
 def _community_maps_human_label(value: str) -> str:
     return value.replace("_", " ")
 
@@ -1008,6 +1028,8 @@ def build_parser() -> argparse.ArgumentParser:
     package_build_check_parser.add_argument("--json", action="store_true", dest="json_output")
     package_pypi_check_parser = package_subcommands.add_parser("pypi-check", help="Check local PyPI readiness without uploading.")
     package_pypi_check_parser.add_argument("--json", action="store_true", dest="json_output")
+    package_dist_check_parser = package_subcommands.add_parser("dist-check", help="Check local build artifact presence.")
+    package_dist_check_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser(
         "doctor",
         help="Check local runtime health.",
@@ -2396,23 +2418,43 @@ def main(argv: list[str] | None = None) -> int:
             print()
             print(f"Result: {'OK' if report['ok'] else 'FAILED'}")
             return 0 if report["ok"] else 1
-        report = _package_pypi_check_result(Path.cwd())
+        if args.package_command == "pypi-check":
+            report = _package_pypi_check_result(Path.cwd())
+            if args.json_output:
+                print(json.dumps(report))
+                return 0 if report["ok"] else 1
+            print("PyPI readiness check")
+            print()
+            print("Checks:")
+            print(f"- package status: {'OK' if report['checks']['package_status']['ok'] else 'FAILED'}")
+            print(f"- build check: {'OK' if report['checks']['build_check']['ok'] else 'FAILED'}")
+            print(f"- README: {'present' if report['checks']['readme']['ok'] else 'missing'}")
+            print(f"- license: {'present' if report['checks']['license']['ok'] else 'missing'}")
+            print(f"- version: {'present' if report['checks']['version']['ok'] else 'missing'}")
+            print(f"- console script: {'present' if report['checks']['console_script']['ok'] else 'missing'}")
+            print()
+            print("PyPI:")
+            print("- not published by this command")
+            print("- upload is manual future step")
+            return 0 if report["ok"] else 1
+
+        report = _package_dist_check_result(Path.cwd())
         if args.json_output:
             print(json.dumps(report))
             return 0 if report["ok"] else 1
-        print("PyPI readiness check")
+        print("Package dist check")
         print()
         print("Checks:")
-        print(f"- package status: {'OK' if report['checks']['package_status']['ok'] else 'FAILED'}")
-        print(f"- build check: {'OK' if report['checks']['build_check']['ok'] else 'FAILED'}")
-        print(f"- README: {'present' if report['checks']['readme']['ok'] else 'missing'}")
-        print(f"- license: {'present' if report['checks']['license']['ok'] else 'missing'}")
-        print(f"- version: {'present' if report['checks']['version']['ok'] else 'missing'}")
-        print(f"- console script: {'present' if report['checks']['console_script']['ok'] else 'missing'}")
+        print(f"- dist directory: {'OK' if report['checks']['dist_dir']['ok'] else 'FAILED'}")
+        print(f"- wheel: {'OK' if report['checks']['wheel']['ok'] else 'FAILED'}")
+        print(f"- sdist: {'OK' if report['checks']['sdist']['ok'] else 'FAILED'}")
+        print(f"- pyproject.toml: {'OK' if report['checks']['pyproject']['ok'] else 'FAILED'}")
+        print(f"- version: {'OK' if report['checks']['version']['ok'] else 'FAILED'}")
         print()
-        print("PyPI:")
-        print("- not published by this command")
-        print("- upload is manual future step")
+        if not report["checks"]["dist_dir"]["ok"]:
+            print("Artifacts have not been built yet.")
+            print()
+        print(f"Result: {'OK' if report['ok'] else 'FAILED'}")
         return 0 if report["ok"] else 1
     if args.command == "doctor":
         report = _doctor_result(Path.cwd())

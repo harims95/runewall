@@ -172,6 +172,48 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["checks"]["package_status"]["ok"])
         self.assertTrue(data["checks"]["build_check"]["ok"])
 
+    def test_package_dist_check_missing_dist_has_clear_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            pyproject_path = Path(temp_dir) / "pyproject.toml"
+            pyproject_path.write_text('[project]\nversion = "0.8.6"\n', encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["package", "dist-check"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        rendered = output.getvalue()
+        self.assertIn("Package dist check", rendered)
+        self.assertIn("- dist directory: FAILED", rendered)
+        self.assertIn("Artifacts have not been built yet.", rendered)
+
+    def test_package_dist_check_json_returns_valid_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_cwd = Path.cwd()
+            output = io.StringIO()
+            dist_dir = Path(temp_dir) / "dist"
+            dist_dir.mkdir()
+            (dist_dir / "runewall-0.8.6-py3-none-any.whl").write_text("", encoding="utf-8")
+            (dist_dir / "runewall-0.8.6.tar.gz").write_text("", encoding="utf-8")
+            (Path(temp_dir) / "pyproject.toml").write_text('[project]\nversion = "0.8.6"\n', encoding="utf-8")
+            try:
+                os.chdir(temp_dir)
+                with redirect_stdout(output):
+                    exit_code = main(["package", "dist-check", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["publish_performed"])
+        self.assertTrue(data["checks"]["dist_dir"]["ok"])
+        self.assertTrue(data["checks"]["wheel"]["ok"])
+        self.assertTrue(data["checks"]["sdist"]["ok"])
+        self.assertEqual(data["checks"]["version"]["value"], "0.8.6")
+
     def test_community_maps_status_exits_zero(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
