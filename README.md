@@ -126,6 +126,16 @@ It shows: version, safe profile, policy audit, dry-run, community package verify
 
 See [demos/README.md](demos/README.md) for details.
 
+## Where to go from here
+
+- Want to try Runewall quickly? Read [docs/QUICKSTART.md](docs/QUICKSTART.md)
+- Want to understand policies? Read [docs/POLICIES.md](docs/POLICIES.md)
+- Want to connect an agent through MCP? Read [docs/MCP_CLIENT_EXAMPLES.md](docs/MCP_CLIENT_EXAMPLES.md)
+- Want to script Runewall from Python? Read [docs/PYTHON_SDK_EXAMPLES.md](docs/PYTHON_SDK_EXAMPLES.md)
+- Want to understand community maps? Read [docs/COMMUNITY_MAPS.md](docs/COMMUNITY_MAPS.md)
+- Want to package or release Runewall locally? Read [docs/PACKAGING.md](docs/PACKAGING.md)
+- Want to see what is planned next? Read [docs/ROADMAP.md](docs/ROADMAP.md)
+
 ## MCP
 
 Runewall includes a local MCP stdio surface for agent safety checks.
