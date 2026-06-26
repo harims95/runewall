@@ -4,6 +4,11 @@
 
 - Pending changes for the next release.
 
+## v1.0.0
+
+- Stable release after rc1 validation.
+- No new features or behavior changes from rc1.
+
 ## v1.0.0-rc1
 
 - Release candidate hardening.
