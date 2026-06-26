@@ -42,6 +42,32 @@ Start with the five-minute quickstart below, or run the 60-second local demo in 
 - Python SDK preview
 - community map package verification
 
+## Integration support matrix
+
+Runewall favors depth over integration count. Only maps with meaningful dry-run/security test coverage are described as tested. Other map ideas may exist in the repo but should be treated as experimental until they have realistic dry-run coverage.
+
+**Core tested** — dry-run, network-isolation, token-safety, and execution-gating tests present:
+
+| Map | Flow | Test functions |
+|---|---|---|
+| GitHub | `create_issue` | 23 |
+| Vercel | `list_projects` | 27 |
+| Netlify | `list_sites` | 24 |
+| Supabase | `list_projects` | 21 |
+| Cloudflare | `list_zones` | 22 |
+
+**Review before advertising** — CLI-level dry-run and map validation tests present; no network-isolation or token-safety coverage yet:
+
+| Map | Flow | Test functions |
+|---|---|---|
+| Slack | `send_message` | 10 |
+| Discord | `send_message` | 9 |
+| Linear | `create_issue` | 7 |
+
+**Experimental / not yet claimed as supported** — map ideas with no test coverage:
+
+Stripe, Notion, Asana, Jira, Trello, Twitter, OpenAI, Anthropic, AWS, GCP, Azure, MongoDB.
+
 ## 5-minute quickstart
 
 Install and run:

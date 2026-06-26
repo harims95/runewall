@@ -24,6 +24,21 @@ v1.0.0 is the stable local-first foundation. It does not include a hosted servic
 - remote registry
 - community map execution
 
+## Documentation / runtime drift (future)
+
+Some experimental map ideas (Slack, Discord, Linear, and others) may still appear
+in default runtime listings (`runewall maps list`, `runewall mcp serve tools/list`,
+help text). This creates drift between what is documented as tested and what the
+runtime enumerates.
+
+Do not fix this now. When the time is right, consider one of:
+
+- Gate experimental maps behind a flag such as `--include-experimental`.
+- Move experimental map files under a directory such as
+  `runewall/maps/experimental/` that the default loader skips.
+
+Do not decide or implement either approach until the tradeoffs are clear.
+
 ## Security test improvements (future)
 
 Lower-priority improvements identified during post-v1.0.1 review.
