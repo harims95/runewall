@@ -16,6 +16,8 @@ It shows:
 
 The demo is local-only, token-free, and does not call external APIs.
 
+This is the fastest way to explain what Runewall does to a new developer.
+
 ## Run it in Windows PowerShell
 
 ```powershell

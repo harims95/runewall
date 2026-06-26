@@ -70,6 +70,16 @@ If you want the same flow as a single local script, run:
 .\demos\runewall_60_second_demo.ps1
 ```
 
+The demo shows:
+
+- version
+- safe profile
+- policy audit
+- dry-run
+- community package verify
+- MCP status
+- SDK status
+
 See [demos/README.md](../demos/README.md) for the full demo steps.
 
 ## Safety notes

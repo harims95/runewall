@@ -9,13 +9,25 @@
 
 Runewall is a local-first safety/runtime layer for AI agents before they take real-world actions.
 
-## Why it exists
+## Why Runewall?
 
-Agents are moving from answering to acting. Before they touch files, APIs, or tools, developers need a local layer that can preview, explain, block, log, and rollback actions.
+Agents are moving from answering to acting. Once agents touch files, APIs, tools, or external systems, developers need a boundary layer that can preview actions, explain policy decisions, block risky behavior, log what happened, and rollback where possible.
+
+## What is it?
+
+Runewall is a local-first CLI and developer tool that sits between an agent and a real action. It helps you inspect what an agent is about to do before you let it touch the outside world.
+
+## Why does it matter?
+
+When agents move beyond chat and start acting on files, services, and tools, mistakes get more expensive. A local safety/runtime layer gives you a clearer review point before that action happens.
 
 ## Architecture flow
 
 `Agent -> Runewall -> policy check -> dry-run -> review/execute/block -> log/audit`
+
+## How do I try it?
+
+Start with the five-minute quickstart below, or run the 60-second local demo in [demos/README.md](demos/README.md).
 
 ## What Runewall can do now
 
@@ -28,10 +40,6 @@ Agents are moving from answering to acting. Before they touch files, APIs, or to
 - local MCP stdio surface
 - Python SDK preview
 - community map package verification
-
-## How do I try it?
-
-Start with the five-minute quickstart below, or run the local demo in [demos/README.md](demos/README.md).
 
 ## 5-minute quickstart
 
@@ -65,14 +73,6 @@ Runewall is currently a local-first CLI/devtool with:
 - Python SDK preview
 - community package verification
 
-Not included yet:
-
-- hosted service
-- dashboard
-- remote registry
-- real signature verification
-- community map execution
-
 ## Safe by default
 
 - real execution is disabled by default
@@ -82,6 +82,14 @@ Not included yet:
 - community maps are non-executable
 - package verify does not import or execute maps
 - no hosted backend is required
+
+## What is not included yet?
+
+- hosted service
+- dashboard
+- remote registry
+- real signature verification
+- community map execution
 
 ## Install
 
@@ -102,6 +110,24 @@ See [docs/QUICKSTART.md](docs/QUICKSTART.md) for a safe first walkthrough.
 ## Demo
 
 See [demos/README.md](demos/README.md) for a 60-second local-only, token-free demo.
+
+## 60-second demo
+
+Run the local demo with:
+
+```powershell
+.\demos\runewall_60_second_demo.ps1
+```
+
+It shows:
+
+- version
+- safe profile
+- policy audit
+- dry-run
+- community package verify
+- MCP status
+- SDK status
 
 ## MCP
 

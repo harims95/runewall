@@ -39,6 +39,11 @@
 
 - v0.9.0 public packaging and release readiness
 - local build artifact verification
+- v0.9.1 final README/demo announcement polish
+
+## Next major
+
+- v1.0.0 release candidate hardening
 
 ## Future
 
