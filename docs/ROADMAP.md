@@ -8,7 +8,7 @@
 - community package verify
 - 60-second demo
 
-## Next
+## Near term
 
 - real signature verification
 - stronger agent integration examples
@@ -30,6 +30,14 @@
 ## v0.8.5
 
 - changelog and release notes template
+
+## v0.8.6
+
+- final release checklist polish
+
+## Next
+
+- v0.9.0 public packaging and release readiness
 
 ## Future
 

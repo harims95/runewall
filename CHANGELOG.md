@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Pending changes for the next release.
+- Pending release checklist polish.
 
 ## v0.8.4
 

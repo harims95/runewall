@@ -1,5 +1,12 @@
 # Runewall vX.Y.Z - short title
 
+## Current status
+
+- local-first CLI and devtool
+- MCP stdio surface
+- Python SDK preview
+- community package verification
+
 ## What changed
 
 - ...
@@ -20,3 +27,11 @@ runewall release checklist
 runewall package build-check
 runewall maps community package verify examples/community-maps --json
 ```
+
+## Not included yet
+
+- hosted backend
+- dashboard
+- remote registry
+- real signature verification
+- community map execution
