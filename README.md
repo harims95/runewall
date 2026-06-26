@@ -62,6 +62,10 @@ See [docs/INSTALL.md](docs/INSTALL.md) for Windows PowerShell-first setup.
 
 See [docs/QUICKSTART.md](docs/QUICKSTART.md) for a safe first walkthrough.
 
+## Demo
+
+See [demos/README.md](demos/README.md) for a 60-second local-only, token-free demo.
+
 ## MCP
 
 Runewall includes a local MCP stdio surface for agent safety checks.
@@ -107,5 +111,6 @@ Verify does not import maps, execute maps, download remote files, or call extern
 - [docs/INSTALL.md](docs/INSTALL.md)
 - [docs/QUICKSTART.md](docs/QUICKSTART.md)
 - [docs/ROADMAP.md](docs/ROADMAP.md)
+- [demos/README.md](demos/README.md)
 - [docs/COMMUNITY_MAPS.md](docs/COMMUNITY_MAPS.md)
 - [docs/PYTHON_SDK_EXAMPLES.md](docs/PYTHON_SDK_EXAMPLES.md)

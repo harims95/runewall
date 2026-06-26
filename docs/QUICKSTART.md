@@ -50,6 +50,16 @@ runewall sdk status --json
 
 This confirms the local Python SDK preview surface is available.
 
+## Run the 60-second demo
+
+If you want the same flow as a single local script, run:
+
+```powershell
+.\demos\runewall_60_second_demo.ps1
+```
+
+See [demos/README.md](../demos/README.md) for the full demo steps.
+
 ## Safety notes
 
 - dry-run does not call external APIs
