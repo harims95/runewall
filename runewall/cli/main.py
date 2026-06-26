@@ -73,11 +73,13 @@ RELEASE_STATUS_RECOMMENDED_COMMANDS = (
 )
 RELEASE_CHECKLIST_REQUIRED_BEFORE_TAG = (
     "python -m pytest tests -v",
+    "runewall release checklist",
     "runewall release check",
     "runewall release json-check",
     "runewall package status",
     "runewall package build-check",
     "runewall package pypi-check",
+    "runewall package dist-check --json",
     "runewall maps community package verify examples/community-maps --json",
     "runewall mcp status --json",
     "runewall sdk status --json",

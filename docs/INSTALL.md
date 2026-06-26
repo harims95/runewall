@@ -63,6 +63,8 @@ runewall package build-check
 runewall package build-check --json
 runewall package pypi-check
 runewall package pypi-check --json
+runewall package dist-check
+runewall package dist-check --json
 ```
 
 See [docs/PACKAGING.md](PACKAGING.md) for local artifact build notes and future PyPI readiness guidance.

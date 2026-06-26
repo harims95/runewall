@@ -102,6 +102,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) for Windows PowerShell-first setup.
 - use [docs/INSTALL.md](docs/INSTALL.md) for setup
 - see [docs/PACKAGING.md](docs/PACKAGING.md) for local packaging notes
 - `runewall package pypi-check` is a local readiness check only
+- `runewall package dist-check` is a local artifact presence check only
 
 ## Quickstart
 

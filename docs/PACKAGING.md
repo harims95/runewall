@@ -67,6 +67,7 @@ See [docs/RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the local release flow
 - run `runewall package status`
 - run `runewall package build-check`
 - run `runewall package pypi-check`
+- run `runewall package dist-check`
 - build local artifacts
 - inspect the `dist/` folder
 - confirm the version is correct

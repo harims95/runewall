@@ -4,6 +4,13 @@
 
 - Pending changes for the next release.
 
+## v1.0.0-rc1
+
+- Release candidate hardening.
+- Public README and announcement polish.
+- Install, quickstart, packaging, and release checklist docs stabilized.
+- No new runtime features.
+
 ## v0.9.0
 
 - Added PyPI/public packaging readiness.

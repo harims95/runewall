@@ -7041,8 +7041,10 @@ class CliTests(unittest.TestCase):
         data = json.loads(output.getvalue())
         self.assertTrue(data["ok"])
         self.assertIn("python -m pytest tests -v", data["release_checklist"]["required_before_tag"])
+        self.assertIn("runewall release checklist", data["release_checklist"]["required_before_tag"])
         self.assertIn("runewall package build-check", data["release_checklist"]["required_before_tag"])
         self.assertIn("runewall package pypi-check", data["release_checklist"]["required_before_tag"])
+        self.assertIn("runewall package dist-check --json", data["release_checklist"]["required_before_tag"])
         self.assertFalse(data["release_checklist"]["pypi"]["published"])
 
     def test_release_status_exists(self) -> None:
