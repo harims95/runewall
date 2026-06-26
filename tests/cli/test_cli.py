@@ -147,7 +147,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("console_script", data["checks"])
         self.assertIn("version", data["checks"])
         self.assertEqual(data["checks"]["console_script"]["name"], "runewall")
-        self.assertEqual(data["checks"]["version"]["value"], "0.8.6")
+        self.assertEqual(data["checks"]["version"]["value"], "0.9.0")
 
     def test_package_pypi_check_exits_zero(self) -> None:
         output = io.StringIO()
@@ -177,7 +177,7 @@ class CliTests(unittest.TestCase):
             original_cwd = Path.cwd()
             output = io.StringIO()
             pyproject_path = Path(temp_dir) / "pyproject.toml"
-            pyproject_path.write_text('[project]\nversion = "0.8.6"\n', encoding="utf-8")
+            pyproject_path.write_text('[project]\nversion = "0.9.0"\n', encoding="utf-8")
             try:
                 os.chdir(temp_dir)
                 with redirect_stdout(output):
@@ -196,9 +196,9 @@ class CliTests(unittest.TestCase):
             output = io.StringIO()
             dist_dir = Path(temp_dir) / "dist"
             dist_dir.mkdir()
-            (dist_dir / "runewall-0.8.6-py3-none-any.whl").write_text("", encoding="utf-8")
-            (dist_dir / "runewall-0.8.6.tar.gz").write_text("", encoding="utf-8")
-            (Path(temp_dir) / "pyproject.toml").write_text('[project]\nversion = "0.8.6"\n', encoding="utf-8")
+            (dist_dir / "runewall-0.9.0-py3-none-any.whl").write_text("", encoding="utf-8")
+            (dist_dir / "runewall-0.9.0.tar.gz").write_text("", encoding="utf-8")
+            (Path(temp_dir) / "pyproject.toml").write_text('[project]\nversion = "0.9.0"\n', encoding="utf-8")
             try:
                 os.chdir(temp_dir)
                 with redirect_stdout(output):
@@ -212,7 +212,7 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["checks"]["dist_dir"]["ok"])
         self.assertTrue(data["checks"]["wheel"]["ok"])
         self.assertTrue(data["checks"]["sdist"]["ok"])
-        self.assertEqual(data["checks"]["version"]["value"], "0.8.6")
+        self.assertEqual(data["checks"]["version"]["value"], "0.9.0")
 
     def test_community_maps_status_exits_zero(self) -> None:
         output = io.StringIO()
@@ -1541,7 +1541,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["id"], 1)
         self.assertEqual(data["result"]["protocolVersion"], "2025-06-18")
         self.assertEqual(data["result"]["serverInfo"]["name"], "runewall")
-        self.assertEqual(data["result"]["serverInfo"]["version"], "0.8.6")
+        self.assertEqual(data["result"]["serverInfo"]["version"], "0.9.0")
 
     def test_mcp_serve_once_handles_tools_list(self) -> None:
         output = io.StringIO()
@@ -1898,7 +1898,7 @@ class CliTests(unittest.TestCase):
             exit_code = main(["version"])
         self.assertEqual(exit_code, 0)
         rendered = output.getvalue().strip()
-        self.assertEqual(rendered, "Runewall 0.8.6")
+        self.assertEqual(rendered, "Runewall 0.9.0")
         self.assertNotIn("{", rendered)
 
     def test_version_json_prints_valid_json(self) -> None:
@@ -1909,7 +1909,7 @@ class CliTests(unittest.TestCase):
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["name"], "runewall")
-        self.assertEqual(data["version"], "0.8.6")
+        self.assertEqual(data["version"], "0.9.0")
 
     def test_version_json_matches_human_version(self) -> None:
         human_output = io.StringIO()

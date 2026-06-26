@@ -4,6 +4,11 @@
 
 - Pending changes for the next release.
 
+## v0.9.0
+
+- Added PyPI/public packaging readiness.
+- Added local build artifact verification.
+
 ## v0.8.6
 
 - Pending release checklist polish.
