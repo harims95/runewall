@@ -23,6 +23,10 @@
 
 - local packaging docs
 
+## v0.8.4
+
+- release checklist command and docs
+
 ## Future
 
 - actual build artifacts

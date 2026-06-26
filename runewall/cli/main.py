@@ -71,6 +71,24 @@ RELEASE_STATUS_RECOMMENDED_COMMANDS = (
     "runewall release json-check",
     "python -m pytest tests -v",
 )
+RELEASE_CHECKLIST_REQUIRED_BEFORE_TAG = (
+    "python -m pytest tests -v",
+    "runewall release check",
+    "runewall release json-check",
+    "runewall package status",
+    "runewall package build-check",
+    "runewall maps community package verify examples/community-maps --json",
+    "runewall mcp status --json",
+    "runewall sdk status --json",
+    "git status",
+)
+RELEASE_CHECKLIST_RECOMMENDED = (
+    "update version",
+    "update CHANGELOG or GitHub release notes",
+    "create tag",
+    "push tag",
+    "create GitHub release",
+)
 MCP_INITIAL_TOOLS = (
     "runewall.policy_test",
     "runewall.policy_audit",
@@ -1016,6 +1034,8 @@ def build_parser() -> argparse.ArgumentParser:
     release_check_parser.add_argument("--json", action="store_true", dest="json_output")
     release_json_check_parser = release_subcommands.add_parser("json-check", help="Check whether the agent-facing JSON contract docs are complete.")
     release_json_check_parser.add_argument("--json", action="store_true", dest="json_output")
+    release_checklist_parser = release_subcommands.add_parser("checklist", help="Show the recommended local release checklist.")
+    release_checklist_parser.add_argument("--json", action="store_true", dest="json_output")
     release_examples_parser = release_subcommands.add_parser("examples", help="Show curated safe release example commands.")
     release_examples_parser.add_argument("--json", action="store_true", dest="json_output")
     release_status_parser = release_subcommands.add_parser("status", help="Show a simple release readiness summary.")
@@ -2738,6 +2758,35 @@ def main(argv: list[str] | None = None) -> int:
             print("Release examples")
             for example in RELEASE_EXAMPLES:
                 print(f"- {example}")
+            return 0
+        if args.release_command == "checklist":
+            report = {
+                "ok": True,
+                "release_checklist": {
+                    "required_before_tag": list(RELEASE_CHECKLIST_REQUIRED_BEFORE_TAG),
+                    "recommended": list(RELEASE_CHECKLIST_RECOMMENDED),
+                    "pypi": {
+                        "published": False,
+                        "note": "Publish only after package artifacts are verified.",
+                    },
+                },
+            }
+            if args.json_output:
+                print(json.dumps(report))
+                return 0
+            print("Release checklist")
+            print()
+            print("Required before tag:")
+            for command in RELEASE_CHECKLIST_REQUIRED_BEFORE_TAG:
+                print(f"- {command}")
+            print()
+            print("Recommended:")
+            for item in RELEASE_CHECKLIST_RECOMMENDED:
+                print(f"- {item}")
+            print()
+            print("PyPI:")
+            print("- not published yet")
+            print("- publish only after package artifacts are verified")
             return 0
         if args.release_command == "status":
             report = {

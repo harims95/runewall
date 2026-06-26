@@ -40,6 +40,8 @@ python -m pip install dist/<wheel-file>.whl
 
 Building artifacts does not call external APIs and does not require tokens.
 
+See [docs/RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the local release flow before tagging or any future publish step.
+
 ## Future PyPI checklist
 
 - confirm version

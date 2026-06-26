@@ -6957,6 +6957,28 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertIn("- runewall release json-check", output.getvalue())
 
+    def test_release_checklist_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "checklist"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Release checklist", rendered)
+        self.assertIn("- python -m pytest tests -v", rendered)
+        self.assertIn("- runewall package build-check", rendered)
+        self.assertIn("- not published yet", rendered)
+
+    def test_release_checklist_json_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["release", "checklist", "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertIn("python -m pytest tests -v", data["release_checklist"]["required_before_tag"])
+        self.assertIn("runewall package build-check", data["release_checklist"]["required_before_tag"])
+        self.assertFalse(data["release_checklist"]["pypi"]["published"])
+
     def test_release_status_exists(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
