@@ -650,6 +650,130 @@ class CliTests(unittest.TestCase):
         self.assertFalse(data["checksums"]["verified"])
         self.assertTrue(any("checksum mismatch" in e for e in data["errors"]))
 
+    def test_package_verify_example_exits_zero(self) -> None:
+        example_dir = ROOT / "examples" / "community-maps"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "package", "verify", str(example_dir)])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map package verify", rendered)
+        self.assertIn("Manifest validation: OK", rendered)
+        self.assertIn("Checksums: OK", rendered)
+        self.assertIn("Signing: not implemented", rendered)
+        self.assertIn("Trusted key check: not applicable", rendered)
+        self.assertIn("Execution: disabled", rendered)
+
+    def test_package_verify_example_json_returns_ok_true(self) -> None:
+        example_dir = ROOT / "examples" / "community-maps"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "package", "verify", str(example_dir), "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertTrue(data["validation"]["ok"])
+        self.assertTrue(data["checksums"]["verified"])
+        self.assertFalse(data["signing"]["implemented"])
+        self.assertFalse(data["signing"]["verified"])
+        self.assertFalse(data["safety"]["execute_enabled"])
+        self.assertFalse(data["trusted_key"]["checked"])
+        self.assertEqual(data["trusted_key"]["status"], "not_applicable")
+
+    def test_package_verify_missing_directory_returns_failure(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["maps", "community", "package", "verify", "no-such-dir", "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("directory not found" in e for e in data["errors"]))
+
+    def test_package_verify_directory_without_manifest_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "package", "verify", temp_dir, "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(any("manifest" in e for e in data["errors"]))
+
+    def test_package_verify_wrong_checksum_returns_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "mymap.json").write_text(
+                '{"site":"github","flow":"f","action_type":"map.dry_run"}', encoding="utf-8"
+            )
+            (Path(temp_dir) / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": "sha256-wrong"},
+                }),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with redirect_stdout(output):
+                exit_code = main(["maps", "community", "package", "verify", temp_dir, "--json"])
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertFalse(data["checksums"]["verified"])
+
+    def test_package_verify_manifest_with_revoked_trusted_key_returns_failure(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as root_dir:
+            pkg_dir = Path(root_dir) / "pkg"
+            pkg_dir.mkdir()
+            (Path(root_dir) / ".runewall" / "trusted-keys").mkdir(parents=True)
+            ((Path(root_dir) / ".runewall" / "trusted-keys") / "example-author-key.json").write_text(
+                json.dumps({
+                    "key_id": "example-author-key",
+                    "algorithm": "ed25519",
+                    "public_key": "base64-placeholder",
+                    "trusted_at": "2026-01-01T00:00:00Z",
+                    "source": "local-file",
+                    "status": "revoked",
+                    "revoked_at": "2026-06-01T00:00:00Z",
+                    "revocation_reason": "user_requested",
+                }),
+                encoding="utf-8",
+            )
+            (pkg_dir / "mymap.json").write_text(
+                '{"site":"github","flow":"f","action_type":"map.dry_run"}',
+                encoding="utf-8",
+            )
+            import hashlib as _hashlib
+            checksum = "sha256-" + _hashlib.sha256((pkg_dir / "mymap.json").read_bytes()).hexdigest()
+            (pkg_dir / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": checksum},
+                    "signing": {"public_key_id": "example-author-key"},
+                }),
+                encoding="utf-8",
+            )
+            try:
+                os.chdir(root_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "package", "verify", str(pkg_dir), "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertTrue(data["trusted_key"]["checked"])
+        self.assertEqual(data["trusted_key"]["status"], "revoked")
+        self.assertEqual(data["trusted_key"]["key_id"], "example-author-key")
+
     def test_package_import_example_exits_zero(self) -> None:
         example_dir = ROOT / "examples" / "community-maps"
         original_cwd = Path.cwd()

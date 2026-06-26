@@ -115,6 +115,21 @@ class PackageImportReport:
 
 
 @dataclass(frozen=True)
+class PackageVerifyReport:
+    ok: bool
+    path: str
+    manifest_path: str | None
+    errors: list[str]
+    validation_ok: bool
+    validation_errors: list[str]
+    validation_warnings: list[str]
+    checksums_verified: bool
+    trusted_key_checked: bool
+    trusted_key_status: str
+    trusted_key_id: str | None
+
+
+@dataclass(frozen=True)
 class TrustedKeyRecord:
     key_id: str
     algorithm: str
@@ -578,6 +593,71 @@ class SiteMapRegistry:
     def inspect_manifest_file(self, path: Path) -> ManifestValidationReport:
         return self.validate_manifest_file(path)
 
+    def verify_package_directory(self, path: Path, root: Path | None = None) -> PackageVerifyReport:
+        resolved_path = str(path)
+
+        if not path.exists():
+            return PackageVerifyReport(
+                ok=False, path=resolved_path, manifest_path=None,
+                errors=[f"directory not found: {resolved_path}"],
+                validation_ok=False, validation_errors=[], validation_warnings=[],
+                checksums_verified=False,
+                trusted_key_checked=False, trusted_key_status="not_applicable", trusted_key_id=None,
+            )
+        if not path.is_dir():
+            return PackageVerifyReport(
+                ok=False, path=resolved_path, manifest_path=None,
+                errors=[f"not a directory: {resolved_path}"],
+                validation_ok=False, validation_errors=[], validation_warnings=[],
+                checksums_verified=False,
+                trusted_key_checked=False, trusted_key_status="not_applicable", trusted_key_id=None,
+            )
+
+        manifest_path = self._find_package_manifest(path)
+        if manifest_path is None:
+            return PackageVerifyReport(
+                ok=False, path=resolved_path, manifest_path=None,
+                errors=["no manifest.json or manifest.example.json found in directory"],
+                validation_ok=False, validation_errors=[], validation_warnings=[],
+                checksums_verified=False,
+                trusted_key_checked=False, trusted_key_status="not_applicable", trusted_key_id=None,
+            )
+
+        report = self.validate_manifest_file(manifest_path)
+        manifest_data = self._load_json_object(manifest_path)
+        signing = manifest_data.get("signing") if isinstance(manifest_data.get("signing"), dict) else None
+        key_id = signing.get("public_key_id") if signing and isinstance(signing.get("public_key_id"), str) and str(signing.get("public_key_id", "")).strip() else None
+
+        trusted_key_checked = key_id is not None
+        trusted_key_status = "not_applicable"
+        if key_id is not None:
+            trusted_record = self.inspect_trusted_key(key_id, root)
+            if trusted_record is None:
+                trusted_key_status = "key_not_found"
+            elif trusted_record.status == "revoked":
+                trusted_key_status = "revoked"
+            else:
+                trusted_key_status = "trusted"
+
+        errors = list(report.errors)
+        if trusted_key_status == "revoked" and key_id is not None:
+            errors.append(f"trusted key is revoked: {key_id}")
+
+        ok = report.ok and trusted_key_status != "revoked"
+        return PackageVerifyReport(
+            ok=ok,
+            path=resolved_path,
+            manifest_path=str(manifest_path),
+            errors=errors,
+            validation_ok=report.ok,
+            validation_errors=report.errors,
+            validation_warnings=report.warnings,
+            checksums_verified=report.checksums_verified,
+            trusted_key_checked=trusted_key_checked,
+            trusted_key_status=trusted_key_status,
+            trusted_key_id=key_id,
+        )
+
     def inspect_package_directory(self, path: Path) -> PackageInspectReport:
         resolved_path = str(path)
 
@@ -598,12 +678,7 @@ class SiteMapRegistry:
                 checksums_verified=False,
             )
 
-        manifest_path: Path | None = None
-        if (path / "manifest.json").is_file():
-            manifest_path = path / "manifest.json"
-        elif (path / "manifest.example.json").is_file():
-            manifest_path = path / "manifest.example.json"
-
+        manifest_path = self._find_package_manifest(path)
         if manifest_path is None:
             return PackageInspectReport(
                 ok=False, path=resolved_path, manifest_path=None,
@@ -646,12 +721,7 @@ class SiteMapRegistry:
                 imported_maps=[], execute_enabled=False,
             )
 
-        manifest_path: Path | None = None
-        if (path / "manifest.json").is_file():
-            manifest_path = path / "manifest.json"
-        elif (path / "manifest.example.json").is_file():
-            manifest_path = path / "manifest.example.json"
-
+        manifest_path = self._find_package_manifest(path)
         if manifest_path is None:
             return PackageImportReport(
                 ok=False, source=resolved_path, manifest_path=None,
@@ -694,6 +764,25 @@ class SiteMapRegistry:
         )
 
     def _load_community_map_data(self, path: Path) -> dict[str, Any]:
+        if not path.exists() or not path.is_file():
+            return {}
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return data
+
+    def _find_package_manifest(self, path: Path) -> Path | None:
+        if (path / "manifest.json").is_file():
+            return path / "manifest.json"
+        if (path / "manifest.example.json").is_file():
+            return path / "manifest.example.json"
+        return None
+
+    def _load_json_object(self, path: Path) -> dict[str, Any]:
         if not path.exists() or not path.is_file():
             return {}
         try:

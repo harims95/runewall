@@ -786,6 +786,9 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_package_inspect_parser = maps_community_package_subcommands.add_parser("inspect", help="Inspect a local community map package directory.")
     maps_community_package_inspect_parser.add_argument("path")
     maps_community_package_inspect_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_package_verify_parser = maps_community_package_subcommands.add_parser("verify", help="Verify a local community map package directory.")
+    maps_community_package_verify_parser.add_argument("path")
+    maps_community_package_verify_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_community_package_import_parser = maps_community_package_subcommands.add_parser("import", help="Import map files from a local community map package.")
     maps_community_package_import_parser.add_argument("path")
     maps_community_package_import_parser.add_argument("--json", action="store_true", dest="json_output")
@@ -1683,6 +1686,62 @@ def main(argv: list[str] | None = None) -> int:
                         for error in all_errors:
                             print(f"- {error}")
                     return 0 if pkg.ok else 1
+                if args.maps_community_package_command == "verify":
+                    report = registry.verify_package_directory(Path(args.path), Path.cwd())
+                    trusted_key = {
+                        "checked": report.trusted_key_checked,
+                        "status": report.trusted_key_status,
+                        "key_id": report.trusted_key_id,
+                    }
+                    _checksums = {"implemented": True, "verified": report.checksums_verified}
+                    _signing = {"implemented": False, "verified": False}
+                    _safety = {
+                        "execute_enabled": False,
+                        "remote_downloads": False,
+                        "external_api_calls": False,
+                    }
+                    if args.json_output:
+                        if report.ok:
+                            print(json.dumps({
+                                "ok": True,
+                                "path": report.path,
+                                "manifest": report.manifest_path,
+                                "validation": {
+                                    "ok": report.validation_ok,
+                                    "errors": report.validation_errors,
+                                    "warnings": report.validation_warnings,
+                                },
+                                "checksums": _checksums,
+                                "signing": _signing,
+                                "trusted_key": trusted_key,
+                                "safety": _safety,
+                            }))
+                            return 0
+                        print(json.dumps({
+                            "ok": False,
+                            "path": report.path,
+                            "manifest": report.manifest_path,
+                            "errors": report.errors,
+                            "checksums": _checksums,
+                            "signing": _signing,
+                            "trusted_key": trusted_key,
+                            "safety": _safety,
+                        }))
+                        return 1
+                    print("Community map package verify")
+                    print("")
+                    print(f"Path: {report.path}")
+                    print(f"Manifest: {report.manifest_path or '-'}")
+                    print(f"Manifest validation: {'OK' if report.validation_ok else 'FAILED'}")
+                    print(f"Checksums: {'OK' if report.checksums_verified else 'failed'}")
+                    print("Signing: not implemented")
+                    print(f"Trusted key check: {trusted_key['status'].replace('_', ' ')}")
+                    print("Execution: disabled")
+                    if report.errors:
+                        print("")
+                        for error in report.errors:
+                            print(f"- {error}")
+                    return 0 if report.ok else 1
                 if args.maps_community_package_command == "import":
                     result = registry.import_package_directory(Path(args.path), Path.cwd())
                     _signing: dict[str, object] = {"implemented": False, "verified": False}

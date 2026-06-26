@@ -63,6 +63,17 @@ See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the manifest
 - Shows name, version, maps count, validation result, checksum status, and safety posture.
 - Does not import, install, or execute anything.
 
+## Package verify
+
+`runewall maps community package verify <directory>` verifies a local community map package directory.
+
+- Looks for `manifest.json` first, then `manifest.example.json`.
+- Validates the manifest using the same logic as `manifest validate`.
+- Verifies local SHA-256 checksums.
+- Reports signing status.
+- Reports trusted key status if the manifest includes a future `signing.public_key_id`.
+- Does not import or execute anything.
+
 ## Package import
 
 `runewall maps community package import <directory>` imports map files from a local community map package.
@@ -114,6 +125,8 @@ runewall maps community manifest inspect examples/community-maps/manifest.exampl
 runewall maps community manifest inspect examples/community-maps/manifest.example.json --json
 runewall maps community package inspect examples/community-maps
 runewall maps community package inspect examples/community-maps --json
+runewall maps community package verify examples/community-maps
+runewall maps community package verify examples/community-maps --json
 runewall maps community package import examples/community-maps
 runewall maps community package import examples/community-maps --json
 runewall maps community signing status

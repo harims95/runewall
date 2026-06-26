@@ -72,6 +72,8 @@ runewall maps community signing status --json
 
 `signing status` — shows which signing features are implemented and which are future work. Checksum verification is implemented; signature generation and verification are not yet implemented.
 
+`package verify` reports signing status for a local package and may report trusted key status from the local key store when a manifest includes `signing.public_key_id`, but it does not verify cryptographic signatures yet.
+
 Future (not yet implemented):
 
 ```

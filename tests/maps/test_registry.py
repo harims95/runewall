@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageImportReport, PackageInspectReport, SiteMapRegistry, TrustKeyReport, TrustedKeyRecord
+from runewall.maps import CommunityMapImportReport, CommunityMapInspectReport, CommunityMapValidationReport, ManifestValidationReport, MapValidationError, PackageImportReport, PackageInspectReport, PackageVerifyReport, SiteMapRegistry, TrustKeyReport, TrustedKeyRecord
 from runewall.maps.registry import FlowNotFoundError, SiteMapNotFoundError, SiteMap, lint_map
 
 
@@ -641,6 +641,85 @@ class SiteMapRegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             result = registry.import_package_directory(example_dir, Path(temp_dir))
         self.assertFalse(result.execute_enabled)
+
+    def test_verify_package_directory_passes_for_example(self) -> None:
+        registry = SiteMapRegistry()
+        report = registry.verify_package_directory(ROOT / "examples" / "community-maps")
+        self.assertIsInstance(report, PackageVerifyReport)
+        self.assertTrue(report.ok)
+        self.assertTrue(report.validation_ok)
+        self.assertTrue(report.checksums_verified)
+        self.assertFalse(report.trusted_key_checked)
+        self.assertEqual(report.trusted_key_status, "not_applicable")
+
+    def test_verify_package_directory_reports_key_not_found_when_manifest_references_missing_key(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "mymap.json").write_text(
+                '{"site":"github","flow":"f","action_type":"map.dry_run"}',
+                encoding="utf-8",
+            )
+            checksum = "sha256-" + __import__("hashlib").sha256((Path(temp_dir) / "mymap.json").read_bytes()).hexdigest()
+            (Path(temp_dir) / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": checksum},
+                    "signing": {"public_key_id": "missing-key"},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.verify_package_directory(Path(temp_dir))
+        self.assertTrue(report.ok)
+        self.assertTrue(report.trusted_key_checked)
+        self.assertEqual(report.trusted_key_status, "key_not_found")
+        self.assertEqual(report.trusted_key_id, "missing-key")
+
+    def test_verify_package_directory_fails_for_revoked_trusted_key_reference(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = Path(temp_dir) / ".runewall" / "trusted-keys"
+            keys_dir.mkdir(parents=True)
+            (keys_dir / "example-author-key.json").write_text(
+                json.dumps({
+                    "key_id": "example-author-key",
+                    "algorithm": "ed25519",
+                    "public_key": "base64-placeholder",
+                    "trusted_at": "2026-01-01T00:00:00Z",
+                    "source": "local-file",
+                    "status": "revoked",
+                    "revoked_at": "2026-06-01T00:00:00Z",
+                    "revocation_reason": "user_requested",
+                }),
+                encoding="utf-8",
+            )
+            pkg_dir = Path(temp_dir) / "pkg"
+            pkg_dir.mkdir()
+            (pkg_dir / "mymap.json").write_text(
+                '{"site":"github","flow":"f","action_type":"map.dry_run"}',
+                encoding="utf-8",
+            )
+            checksum = "sha256-" + __import__("hashlib").sha256((pkg_dir / "mymap.json").read_bytes()).hexdigest()
+            (pkg_dir / "manifest.json").write_text(
+                json.dumps({
+                    "manifest_version": "0.1", "name": "n", "version": "0.1.0", "description": "d",
+                    "author": {"name": "a"},
+                    "maps": [{"path": "mymap.json", "site": "github", "flow": "f", "action_type": "map.dry_run"}],
+                    "permissions": {"external_api_calls": False, "execute_enabled": False},
+                    "safety": {"secrets_in_files": False, "dry_run_first": True, "community_execution_allowed": False},
+                    "checksums": {"mymap.json": checksum},
+                    "signing": {"public_key_id": "example-author-key"},
+                }),
+                encoding="utf-8",
+            )
+            report = registry.verify_package_directory(pkg_dir, Path(temp_dir))
+        self.assertFalse(report.ok)
+        self.assertTrue(report.trusted_key_checked)
+        self.assertEqual(report.trusted_key_status, "revoked")
+        self.assertTrue(any("revoked" in error for error in report.errors))
 
     def test_list_trusted_keys_returns_empty_when_folder_missing(self) -> None:
         registry = SiteMapRegistry()
