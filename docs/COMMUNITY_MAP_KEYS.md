@@ -1,8 +1,6 @@
 # Community Map Keys
 
-Design document only. Not implemented.
-
-No key store exists yet. Runewall does not yet verify signatures.
+Runewall has a local trusted key store for explicit trust decisions. Runewall does not yet verify signatures.
 
 ## 1. Purpose
 
@@ -10,7 +8,7 @@ The local trusted key store will let users explicitly trust publisher public key
 
 ## 2. Current status
 
-- Design-only. No key store exists yet.
+- Local trusted key store is implemented for `keys status`, `keys list`, `keys inspect`, `keys trust`, and `keys revoke`.
 - Runewall does not yet verify signatures.
 - Runewall does verify local SHA-256 checksums for manifest-listed map files.
 - See [docs/COMMUNITY_MAP_SIGNING.md](COMMUNITY_MAP_SIGNING.md) for the signing design.
@@ -26,7 +24,7 @@ The local trusted key store will let users explicitly trust publisher public key
 - signing must not imply execution
 - community map execution remains disabled
 
-## 4. Proposed local storage path
+## 4. Local storage path
 
 Trusted keys would be stored at:
 
@@ -36,7 +34,7 @@ Trusted keys would be stored at:
 
 One JSON file per trusted key, keyed by `key_id`.
 
-## 5. Proposed trusted key record
+## 5. Trusted key record
 
 ```json
 {
@@ -53,8 +51,6 @@ One JSON file per trusted key, keyed by `key_id`.
 
 ## 6. Commands
 
-`keys status`, `keys list`, `keys inspect`, and `keys trust` are implemented. Revoke is future work.
-
 ```
 runewall maps community keys status
 runewall maps community keys status --json
@@ -65,6 +61,10 @@ runewall maps community keys inspect <key-id> --json
 runewall maps community keys trust <key-file>
 runewall maps community keys trust <key-file> --json
 runewall maps community keys trust <key-file> --force
+runewall maps community keys revoke <key-id>
+runewall maps community keys revoke <key-id> --json
+runewall maps community keys revoke <key-id> --reason "reason"
+runewall maps community keys revoke <key-id> --json --reason "reason"
 ```
 
 `keys status` — shows the key store mode, storage path, implemented features, and safety posture.
@@ -81,13 +81,7 @@ Use `--force` to overwrite an existing trusted key record. Without `--force`, tr
 
 See `examples/community-maps/keys/example-author-key.json` for an example key file.
 
-Future (not yet implemented):
-
-```
-runewall maps community keys revoke <key-id>
-```
-
-`keys revoke <key-id>` — mark a trusted key as revoked so it fails future verification.
+`keys revoke <key-id>` — local-only revoke. It does not delete the key record. Instead, it updates the stored record with `status: revoked`, adds `revoked_at`, and stores `revocation_reason` using either the provided `--reason` value or `user_requested`. Revoke does not enable or disable community map execution.
 
 ## 7. Key rotation policy
 
@@ -106,9 +100,7 @@ runewall maps community keys revoke <key-id>
 - automatic trust
 - community map execution
 
-## 9. Trusted key revoke design
-
-Design-only. Not implemented.
+## 9. Trusted key revoke behavior
 
 ### Purpose
 
@@ -118,7 +110,7 @@ Revoking a trusted key should let a user locally mark a publisher key as no long
 
 Revocation is local-only. Runewall must not depend on remote revocation lists yet. Remote revocation discovery is future work.
 
-### Proposed revoked key record behavior
+### Revoked key record behavior
 
 A revoked key record sets `"status": "revoked"` and may include optional fields:
 
@@ -135,16 +127,7 @@ A revoked key record sets `"status": "revoked"` and may include optional fields:
 }
 ```
 
-### Future command
-
-Not implemented. Planned for a future release:
-
-```
-runewall maps community keys revoke <key-id>
-runewall maps community keys revoke <key-id> --reason "reason"
-```
-
-### Expected future behavior
+### Implemented behavior
 
 - revoked keys should still appear in `keys list` with `status: revoked`
 - `keys inspect` should show `status: revoked`

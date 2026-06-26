@@ -476,12 +476,8 @@ def _trusted_keys_status_result() -> dict[str, object]:
         "trusted_keys": {
             "mode": "local-explicit-trust-only",
             "storage": ".runewall/trusted-keys/",
-            "implemented": ["key_store_status"],
+            "implemented": ["key_store_status", "key_list", "key_inspect", "key_trust", "key_revoke"],
             "not_implemented_yet": [
-                "key_list",
-                "key_trust",
-                "key_inspect",
-                "key_revoke",
                 "signature_verification",
                 "remote_key_discovery",
             ],
@@ -810,6 +806,10 @@ def build_parser() -> argparse.ArgumentParser:
     maps_community_keys_trust_parser.add_argument("key_file")
     maps_community_keys_trust_parser.add_argument("--json", action="store_true", dest="json_output")
     maps_community_keys_trust_parser.add_argument("--force", action="store_true")
+    maps_community_keys_revoke_parser = maps_community_keys_subcommands.add_parser("revoke", help="Revoke a locally trusted key by key-id.")
+    maps_community_keys_revoke_parser.add_argument("key_id", nargs="?", default=None)
+    maps_community_keys_revoke_parser.add_argument("--json", action="store_true", dest="json_output")
+    maps_community_keys_revoke_parser.add_argument("--reason", default="user_requested")
     sdk_parser = subcommands.add_parser(
         "sdk",
         help="Inspect Python SDK preview surface.",
@@ -1850,6 +1850,10 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"Status: {record.status}")
                     print(f"Source: {record.source}")
                     print(f"Trusted at: {record.trusted_at}")
+                    if record.revoked_at:
+                        print(f"Revoked at: {record.revoked_at}")
+                    if record.revocation_reason:
+                        print(f"Revocation reason: {record.revocation_reason}")
                     return 0
                 if args.maps_community_keys_command == "trust":
                     report = registry.trust_key_file(Path(args.key_file), Path.cwd(), force=args.force)
@@ -1879,6 +1883,42 @@ def main(argv: list[str] | None = None) -> int:
                         for error in report.errors:
                             print(f"- {error}")
                     return 0 if report.ok else 1
+                if args.maps_community_keys_command == "revoke":
+                    reason = args.reason if isinstance(args.reason, str) and args.reason.strip() else "user_requested"
+                    if not args.key_id:
+                        if args.json_output:
+                            print(json.dumps({"ok": False, "error": "Missing required argument: key-id", "error_code": "missing_key_id"}))
+                            return 1
+                        print("Missing required argument: key-id")
+                        return 1
+                    report = registry.revoke_trusted_key(args.key_id, Path.cwd(), reason=reason)
+                    if args.json_output:
+                        if report.ok:
+                            print(json.dumps({
+                                "ok": True,
+                                "key_id": report.key_id,
+                                "status": "revoked",
+                                "revocation_reason": reason,
+                                "signature_verification_enabled": False,
+                                "community_execution_enabled": False,
+                            }))
+                            return 0
+                        print(json.dumps({
+                            "ok": False,
+                            "error": report.errors[0] if report.errors else "Unknown error",
+                            "error_code": report.error_code or "unknown_error",
+                        }))
+                        return 1
+                    if report.ok:
+                        print("Community map trusted key revoked: OK")
+                        print(f"Key ID: {report.key_id}")
+                        print("Status: revoked")
+                        print(f"Reason: {reason}")
+                        return 0
+                    print("Community map trusted key revoked: FAILED")
+                    for error in report.errors:
+                        print(f"- {error}")
+                    return 1
         if args.maps_command == "list":
             site_maps = registry.list_maps()
             if args.category:

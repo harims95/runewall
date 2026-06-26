@@ -758,6 +758,32 @@ class SiteMapRegistryTests(unittest.TestCase):
             report = registry.trust_key_file(self._example_key_file(), Path(temp_dir), force=True)
         self.assertTrue(report.ok)
 
+    def test_revoke_trusted_key_marks_record_revoked_and_preserves_fields(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            registry.trust_key_file(self._example_key_file(), Path(temp_dir))
+            report = registry.revoke_trusted_key("example-author-key", Path(temp_dir), reason="rotated")
+            stored_path = Path(temp_dir) / ".runewall" / "trusted-keys" / "example-author-key.json"
+            stored_data = json.loads(stored_path.read_text(encoding="utf-8"))
+        self.assertTrue(report.ok)
+        self.assertEqual(report.key_id, "example-author-key")
+        self.assertEqual(stored_data["key_id"], "example-author-key")
+        self.assertEqual(stored_data["algorithm"], "ed25519")
+        self.assertEqual(stored_data["public_key"], "base64-public-key-placeholder")
+        self.assertEqual(stored_data["source"], "local-file")
+        self.assertEqual(stored_data["status"], "revoked")
+        self.assertEqual(stored_data["revocation_reason"], "rotated")
+        self.assertIn("trusted_at", stored_data)
+        self.assertIn("revoked_at", stored_data)
+        self.assertNotIn("private_key", stored_data)
+
+    def test_revoke_trusted_key_returns_not_found_for_unknown_key(self) -> None:
+        registry = SiteMapRegistry()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = registry.revoke_trusted_key("no-such-key", Path(temp_dir))
+        self.assertFalse(report.ok)
+        self.assertEqual(report.error_code, "key_not_found")
+
 
 if __name__ == "__main__":
     unittest.main()

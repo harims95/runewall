@@ -122,6 +122,8 @@ class TrustedKeyRecord:
     trusted_at: str
     source: str
     status: str
+    revoked_at: str | None = None
+    revocation_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -222,6 +224,8 @@ class SiteMapRegistry:
                 trusted_at=data["trusted_at"],
                 source=data["source"],
                 status=data["status"],
+                revoked_at=data.get("revoked_at") if isinstance(data.get("revoked_at"), str) else None,
+                revocation_reason=data.get("revocation_reason") if isinstance(data.get("revocation_reason"), str) else None,
             ))
         return records, warnings
 
@@ -283,6 +287,29 @@ class SiteMapRegistry:
 
         stored_at = (Path(".runewall") / "trusted-keys" / f"{key_id}.json").as_posix()
         return TrustKeyReport(ok=True, key_id=key_id, stored_at=stored_at, errors=[], error_code=None)
+
+    def revoke_trusted_key(self, key_id: str, root: Path | None = None, *, reason: str = "user_requested") -> TrustKeyReport:
+        record = self.inspect_trusted_key(key_id, root)
+        if record is None:
+            return TrustKeyReport(ok=False, key_id=key_id, stored_at=None, errors=["Trusted key not found"], error_code="key_not_found")
+
+        destination_path = self.trusted_keys_path(root) / f"{record.key_id}.json"
+        if not destination_path.exists() or not destination_path.is_file():
+            return TrustKeyReport(ok=False, key_id=key_id, stored_at=None, errors=["Trusted key not found"], error_code="key_not_found")
+
+        with destination_path.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if not isinstance(data, dict):
+            return TrustKeyReport(ok=False, key_id=key_id, stored_at=None, errors=["Trusted key not found"], error_code="key_not_found")
+
+        revoked_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        data["status"] = "revoked"
+        data["revoked_at"] = revoked_at
+        data["revocation_reason"] = reason if reason.strip() else "user_requested"
+        destination_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+        stored_at = (Path(".runewall") / "trusted-keys" / f"{record.key_id}.json").as_posix()
+        return TrustKeyReport(ok=True, key_id=record.key_id, stored_at=stored_at, errors=[], error_code=None)
 
     def list_maps(self) -> list[SiteMap]:
         maps: list[SiteMap] = []

@@ -1117,6 +1117,129 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["key"]["key_id"], "example-author-key")
         self.assertEqual(data["key"]["status"], "trusted")
 
+    def test_keys_revoke_exits_zero_for_local_trusted_key(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                self._write_test_key(Path(temp_dir) / ".runewall" / "trusted-keys")
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "revoke", "example-author-key"])
+                stored_path = Path(temp_dir) / ".runewall" / "trusted-keys" / "example-author-key.json"
+                stored_data = json.loads(stored_path.read_text(encoding="utf-8"))
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Community map trusted key revoked: OK", rendered)
+        self.assertIn("Status: revoked", rendered)
+        self.assertIn("Reason: user_requested", rendered)
+        self.assertEqual(stored_data["status"], "revoked")
+        self.assertIn("revoked_at", stored_data)
+        self.assertEqual(stored_data["revocation_reason"], "user_requested")
+        self.assertNotIn("private_key", stored_data)
+
+    def test_keys_revoke_json_returns_ok_true(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                self._write_test_key(Path(temp_dir) / ".runewall" / "trusted-keys")
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "revoke", "example-author-key", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["key_id"], "example-author-key")
+        self.assertEqual(data["status"], "revoked")
+        self.assertEqual(data["revocation_reason"], "user_requested")
+        self.assertFalse(data["signature_verification_enabled"])
+        self.assertFalse(data["community_execution_enabled"])
+        self.assertNotIn("private_key", data)
+
+    def test_keys_revoke_reason_updates_stored_record(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                self._write_test_key(Path(temp_dir) / ".runewall" / "trusted-keys")
+                main(["maps", "community", "keys", "revoke", "example-author-key", "--reason", "rotated"])
+                stored_path = Path(temp_dir) / ".runewall" / "trusted-keys" / "example-author-key.json"
+                stored_data = json.loads(stored_path.read_text(encoding="utf-8"))
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(stored_data["status"], "revoked")
+        self.assertEqual(stored_data["revocation_reason"], "rotated")
+        self.assertIn("revoked_at", stored_data)
+
+    def test_keys_list_still_shows_revoked_key(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                self._write_test_key(Path(temp_dir) / ".runewall" / "trusted-keys")
+                main(["maps", "community", "keys", "revoke", "example-author-key"])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "list"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("example-author-key", rendered)
+        self.assertIn("Status: revoked", rendered)
+
+    def test_keys_inspect_shows_revoked_status(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                self._write_test_key(Path(temp_dir) / ".runewall" / "trusted-keys")
+                main(["maps", "community", "keys", "revoke", "example-author-key", "--reason", "rotated"])
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "inspect", "example-author-key"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Status: revoked", rendered)
+        self.assertIn("Revocation reason: rotated", rendered)
+
+    def test_keys_revoke_unknown_key_returns_not_found(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "revoke", "no-such-key", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error_code"], "key_not_found")
+
+    def test_keys_revoke_missing_key_id_returns_clear_error(self) -> None:
+        original_cwd = Path.cwd()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                output = io.StringIO()
+                with redirect_stdout(output):
+                    exit_code = main(["maps", "community", "keys", "revoke", "--json"])
+            finally:
+                os.chdir(original_cwd)
+        self.assertEqual(exit_code, 1)
+        data = json.loads(output.getvalue())
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error_code"], "missing_key_id")
+
     def test_mcp_serve_handles_two_newline_delimited_requests(self) -> None:
         output = io.StringIO()
         request_stream = (
