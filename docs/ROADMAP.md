@@ -27,6 +27,10 @@
 
 - release checklist command and docs
 
+## v0.8.5
+
+- changelog and release notes template
+
 ## Future
 
 - actual build artifacts

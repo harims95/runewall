@@ -33,3 +33,5 @@ git status
 
 - PyPI is future work and not published yet.
 - Publish only after package artifacts are verified.
+- Update `CHANGELOG.md` or prepare release notes before tagging.
+- See [docs/RELEASE_NOTES_TEMPLATE.md](RELEASE_NOTES_TEMPLATE.md) for a reusable GitHub release template.
