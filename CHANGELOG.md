@@ -4,6 +4,18 @@
 
 - Pending changes for the next release.
 
+## v1.0.1 — 2026-06-26
+
+- README cleanup for PyPI release: PyPI install command, consolidated quickstart sections, removed duplicate demo sections.
+- Added `pip install runewall` as the primary install command; editable install moved to developer note.
+- Added PyPI version badge and CI status badge; removed stale static tests badge.
+- CI matrix updated to test Python 3.11, 3.12, and 3.13.
+- Fixed `requires-python` from `>=3.10` to `>=3.11` to match actual `tomllib` stdlib requirement.
+- Added `brain/README.md`, `maps/README.md`, `runewall/maps/README.md`, and `specs/README.md` to clarify directory purposes.
+- Added clarification note to `AGENTS.md` distinguishing it from Runewall's runtime agent model or MCP spec.
+- Clarified v1.0.0 scope in README and ROADMAP: stable local-first foundation; signing, hosted service, community map execution, and full MCP/SDK approve-execute lifecycle remain v1.x work.
+- No runtime behavior changes.
+
 ## v1.0.0
 
 - Stable release after rc1 validation.

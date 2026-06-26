@@ -147,7 +147,7 @@ class CliTests(unittest.TestCase):
         self.assertIn("console_script", data["checks"])
         self.assertIn("version", data["checks"])
         self.assertEqual(data["checks"]["console_script"]["name"], "runewall")
-        self.assertEqual(data["checks"]["version"]["value"], "1.0.0")
+        self.assertEqual(data["checks"]["version"]["value"], "1.0.1")
 
     def test_package_pypi_check_exits_zero(self) -> None:
         output = io.StringIO()
@@ -1541,7 +1541,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["id"], 1)
         self.assertEqual(data["result"]["protocolVersion"], "2025-06-18")
         self.assertEqual(data["result"]["serverInfo"]["name"], "runewall")
-        self.assertEqual(data["result"]["serverInfo"]["version"], "1.0.0")
+        self.assertEqual(data["result"]["serverInfo"]["version"], "1.0.1")
 
     def test_mcp_serve_once_handles_tools_list(self) -> None:
         output = io.StringIO()
@@ -1898,7 +1898,7 @@ class CliTests(unittest.TestCase):
             exit_code = main(["version"])
         self.assertEqual(exit_code, 0)
         rendered = output.getvalue().strip()
-        self.assertEqual(rendered, "Runewall 1.0.0")
+        self.assertEqual(rendered, "Runewall 1.0.1")
         self.assertNotIn("{", rendered)
 
     def test_version_json_prints_valid_json(self) -> None:
@@ -1909,7 +1909,7 @@ class CliTests(unittest.TestCase):
         import json as _json
         data = _json.loads(output.getvalue())
         self.assertEqual(data["name"], "runewall")
-        self.assertEqual(data["version"], "1.0.0")
+        self.assertEqual(data["version"], "1.0.1")
 
     def test_version_json_matches_human_version(self) -> None:
         human_output = io.StringIO()
