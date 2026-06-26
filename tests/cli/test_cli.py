@@ -102,6 +102,28 @@ class CliTests(unittest.TestCase):
         self.assertIn("dry_run", data["sdk"]["available_functions"])
         self.assertFalse(data["sdk"]["safety"]["execute_exposed"])
 
+    def test_package_status_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["package", "status"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Package status", rendered)
+        self.assertIn("- local editable supported", rendered)
+        self.assertIn("- not published yet", rendered)
+        self.assertIn("- console script: runewall", rendered)
+
+    def test_package_status_json_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["package", "status", "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["package"]["pypi_published"])
+        self.assertEqual(data["package"]["console_script"], "runewall")
+        self.assertEqual(data["package"]["python_package"], "runewall")
+
     def test_community_maps_status_exits_zero(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):

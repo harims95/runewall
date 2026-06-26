@@ -7,6 +7,7 @@ Recommended starting commands:
 ```powershell
 python -m pip install -e ".[dev]"
 runewall version
+runewall package status --json
 runewall config profile safe
 runewall policy audit
 runewall maps community package verify examples/community-maps --json

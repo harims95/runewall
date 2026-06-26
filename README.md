@@ -87,6 +87,12 @@ Not included yet:
 
 See [docs/INSTALL.md](docs/INSTALL.md) for Windows PowerShell-first setup.
 
+## Install status
+
+- local editable install is supported
+- PyPI publishing is future work
+- use [docs/INSTALL.md](docs/INSTALL.md) for setup
+
 ## Quickstart
 
 See [docs/QUICKSTART.md](docs/QUICKSTART.md) for a safe first walkthrough.

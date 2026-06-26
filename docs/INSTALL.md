@@ -27,6 +27,14 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+## Future PyPI install
+
+```powershell
+pip install runewall
+```
+
+PyPI install is future work. Runewall is not published there yet.
+
 ## Check the install
 
 ```powershell
@@ -39,6 +47,16 @@ If `runewall version` prints a version string, the local install is ready.
 
 ```powershell
 python -m pytest tests -v
+```
+
+## Package readiness checks
+
+```powershell
+runewall version
+runewall release check
+python -m pytest tests -v
+runewall package status
+runewall package status --json
 ```
 
 ## Safe first commands

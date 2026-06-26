@@ -446,6 +446,21 @@ def _community_maps_status_result() -> dict[str, object]:
     }
 
 
+def _package_status_result(root: Path) -> dict[str, object]:
+    license_present = any((root / name).exists() for name in ("LICENSE", "LICENSE.txt", "LICENSE.md"))
+    return {
+        "ok": True,
+        "package": {
+            "local_editable_install": True,
+            "pypi_published": False,
+            "console_script": "runewall",
+            "python_package": "runewall",
+            "readme_present": (root / "README.md").exists(),
+            "license_present": license_present,
+        },
+    }
+
+
 def _community_maps_human_label(value: str) -> str:
     return value.replace("_", " ")
 
@@ -886,6 +901,14 @@ def build_parser() -> argparse.ArgumentParser:
     policy_audit_parser.add_argument("--json", action="store_true", dest="json_output")
     version_parser = subcommands.add_parser("version", help="Print Runewall version.")
     version_parser.add_argument("--json", action="store_true", dest="json_output")
+    package_parser = subcommands.add_parser(
+        "package",
+        help="Inspect local package publishing readiness.",
+        description="Inspect local package publishing readiness.",
+    )
+    package_subcommands = package_parser.add_subparsers(dest="package_command", required=True)
+    package_status_parser = package_subcommands.add_parser("status", help="Show local package status.")
+    package_status_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser(
         "doctor",
         help="Check local runtime health.",
@@ -2230,6 +2253,27 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"name": "runewall", "version": ver}))
             return 0
         print(f"Runewall {ver}")
+        return 0
+    if args.command == "package":
+        report = _package_status_result(Path.cwd())
+        if args.json_output:
+            print(json.dumps(report))
+            return 0
+        package = report["package"]
+        print("Package status")
+        print()
+        print("Install mode:")
+        print("- local editable supported")
+        print()
+        print("PyPI:")
+        print("- not published yet")
+        print()
+        print("Checks:")
+        print(f"- console script: {package['console_script']}")
+        print(f"- Python package: {package['python_package']}")
+        print(f"- README: {'present' if package['readme_present'] else 'missing'}")
+        print(f"- license: {'present' if package['license_present'] else 'missing'}")
+        print("- tests: run with python -m pytest tests -v")
         return 0
     if args.command == "doctor":
         report = _doctor_result(Path.cwd())
