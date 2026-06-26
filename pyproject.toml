@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Environment :: Console",
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = ["beautifulsoup4>=4.12", "httpx>=0.27"]

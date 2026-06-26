@@ -41,6 +41,6 @@
 
 ## Future
 
-- actual build artifacts
-- PyPI publish
 - actual PyPI publish workflow
+- real signature verification
+- MCP/SDK approve-execute lifecycle

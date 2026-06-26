@@ -149,6 +149,29 @@ class CliTests(unittest.TestCase):
         self.assertEqual(data["checks"]["console_script"]["name"], "runewall")
         self.assertEqual(data["checks"]["version"]["value"], "0.8.6")
 
+    def test_package_pypi_check_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["package", "pypi-check"])
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("PyPI readiness check", rendered)
+        self.assertIn("- package status: OK", rendered)
+        self.assertIn("- build check: OK", rendered)
+        self.assertIn("- not published by this command", rendered)
+
+    def test_package_pypi_check_json_exits_zero(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            exit_code = main(["package", "pypi-check", "--json"])
+        self.assertEqual(exit_code, 0)
+        data = json.loads(output.getvalue())
+        self.assertTrue(data["ok"])
+        self.assertFalse(data["pypi"]["published_by_command"])
+        self.assertFalse(data["pypi"]["upload_supported"])
+        self.assertTrue(data["checks"]["package_status"]["ok"])
+        self.assertTrue(data["checks"]["build_check"]["ok"])
+
     def test_community_maps_status_exits_zero(self) -> None:
         output = io.StringIO()
         with redirect_stdout(output):
@@ -6977,6 +7000,7 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertIn("python -m pytest tests -v", data["release_checklist"]["required_before_tag"])
         self.assertIn("runewall package build-check", data["release_checklist"]["required_before_tag"])
+        self.assertIn("runewall package pypi-check", data["release_checklist"]["required_before_tag"])
         self.assertFalse(data["release_checklist"]["pypi"]["published"])
 
     def test_release_status_exists(self) -> None:

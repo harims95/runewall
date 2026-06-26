@@ -10,10 +10,11 @@ This is the recommended local release flow before tagging or publishing anything
 4. run release json-check
 5. run package status
 6. run package build-check
-7. run community package verify
-8. run MCP status
-9. run SDK status
-10. confirm `git status`
+7. run package pypi-check
+8. run community package verify
+9. run MCP status
+10. run SDK status
+11. confirm `git status`
 
 ## PowerShell
 
@@ -24,6 +25,7 @@ runewall release check
 runewall release json-check
 runewall package status
 runewall package build-check
+runewall package pypi-check
 runewall maps community package verify examples/community-maps --json
 runewall mcp status --json
 runewall sdk status --json
@@ -49,4 +51,5 @@ git status
 
 - PyPI is future work and not published yet.
 - Publish only after package artifacts are verified.
+- `runewall package pypi-check` is local-only and does not upload anything.
 - See [docs/RELEASE_NOTES_TEMPLATE.md](RELEASE_NOTES_TEMPLATE.md) for a reusable GitHub release template.

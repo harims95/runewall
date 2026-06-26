@@ -77,6 +77,7 @@ RELEASE_CHECKLIST_REQUIRED_BEFORE_TAG = (
     "runewall release json-check",
     "runewall package status",
     "runewall package build-check",
+    "runewall package pypi-check",
     "runewall maps community package verify examples/community-maps --json",
     "runewall mcp status --json",
     "runewall sdk status --json",
@@ -532,6 +533,29 @@ def _package_build_check_result(root: Path) -> dict[str, object]:
     }
 
 
+def _package_pypi_check_result(root: Path) -> dict[str, object]:
+    package_status = _package_status_result(root)
+    build_check = _package_build_check_result(root)
+    package = package_status["package"]
+    checks = {
+        "package_status": {"ok": bool(package_status["ok"])},
+        "build_check": {"ok": bool(build_check["ok"])},
+        "readme": {"ok": bool(package["readme_present"])},
+        "license": {"ok": bool(package["license_present"])},
+        "version": {"ok": bool(build_check["checks"]["version"]["ok"])},
+        "console_script": {"ok": bool(build_check["checks"]["console_script"]["ok"])},
+    }
+    return {
+        "ok": all(check["ok"] for check in checks.values()),
+        "pypi": {
+            "published_by_command": False,
+            "upload_supported": False,
+            "manual_future_step": True,
+        },
+        "checks": checks,
+    }
+
+
 def _community_maps_human_label(value: str) -> str:
     return value.replace("_", " ")
 
@@ -982,6 +1006,8 @@ def build_parser() -> argparse.ArgumentParser:
     package_status_parser.add_argument("--json", action="store_true", dest="json_output")
     package_build_check_parser = package_subcommands.add_parser("build-check", help="Check local package build readiness.")
     package_build_check_parser.add_argument("--json", action="store_true", dest="json_output")
+    package_pypi_check_parser = package_subcommands.add_parser("pypi-check", help="Check local PyPI readiness without uploading.")
+    package_pypi_check_parser.add_argument("--json", action="store_true", dest="json_output")
     doctor_parser = subcommands.add_parser(
         "doctor",
         help="Check local runtime health.",
@@ -2351,23 +2377,42 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- license: {'present' if package['license_present'] else 'missing'}")
             print("- tests: run with python -m pytest tests -v")
             return 0
-        report = _package_build_check_result(Path.cwd())
+        if args.package_command == "build-check":
+            report = _package_build_check_result(Path.cwd())
+            if args.json_output:
+                print(json.dumps(report))
+                return 0 if report["ok"] else 1
+            print("Package build check")
+            print()
+            print("Checks:")
+            print(f"- pyproject.toml: {'OK' if report['checks']['pyproject']['ok'] else 'MISSING'}")
+            print(f"- README: {'OK' if report['checks']['readme']['ok'] else 'MISSING'}")
+            print(f"- license: {'OK' if report['checks']['license']['ok'] else 'MISSING'}")
+            print(f"- package directory: {'OK' if report['checks']['package_dir']['ok'] else 'MISSING'}")
+            print(f"- console script: {'OK' if report['checks']['console_script']['ok'] else 'MISSING'}")
+            print(f"- version: {'OK' if report['checks']['version']['ok'] else 'MISSING'}")
+            print(f"- install docs: {'OK' if report['checks']['install_docs']['ok'] else 'MISSING'}")
+            print(f"- tests: {'OK' if report['checks']['tests']['ok'] else 'MISSING'}")
+            print()
+            print(f"Result: {'OK' if report['ok'] else 'FAILED'}")
+            return 0 if report["ok"] else 1
+        report = _package_pypi_check_result(Path.cwd())
         if args.json_output:
             print(json.dumps(report))
             return 0 if report["ok"] else 1
-        print("Package build check")
+        print("PyPI readiness check")
         print()
         print("Checks:")
-        print(f"- pyproject.toml: {'OK' if report['checks']['pyproject']['ok'] else 'MISSING'}")
-        print(f"- README: {'OK' if report['checks']['readme']['ok'] else 'MISSING'}")
-        print(f"- license: {'OK' if report['checks']['license']['ok'] else 'MISSING'}")
-        print(f"- package directory: {'OK' if report['checks']['package_dir']['ok'] else 'MISSING'}")
-        print(f"- console script: {'OK' if report['checks']['console_script']['ok'] else 'MISSING'}")
-        print(f"- version: {'OK' if report['checks']['version']['ok'] else 'MISSING'}")
-        print(f"- install docs: {'OK' if report['checks']['install_docs']['ok'] else 'MISSING'}")
-        print(f"- tests: {'OK' if report['checks']['tests']['ok'] else 'MISSING'}")
+        print(f"- package status: {'OK' if report['checks']['package_status']['ok'] else 'FAILED'}")
+        print(f"- build check: {'OK' if report['checks']['build_check']['ok'] else 'FAILED'}")
+        print(f"- README: {'present' if report['checks']['readme']['ok'] else 'missing'}")
+        print(f"- license: {'present' if report['checks']['license']['ok'] else 'missing'}")
+        print(f"- version: {'present' if report['checks']['version']['ok'] else 'missing'}")
+        print(f"- console script: {'present' if report['checks']['console_script']['ok'] else 'missing'}")
         print()
-        print(f"Result: {'OK' if report['ok'] else 'FAILED'}")
+        print("PyPI:")
+        print("- not published by this command")
+        print("- upload is manual future step")
         return 0 if report["ok"] else 1
     if args.command == "doctor":
         report = _doctor_result(Path.cwd())
