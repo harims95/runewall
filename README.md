@@ -92,6 +92,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) for Windows PowerShell-first setup.
 - local editable install is supported
 - PyPI publishing is future work
 - use [docs/INSTALL.md](docs/INSTALL.md) for setup
+- see [docs/PACKAGING.md](docs/PACKAGING.md) for local packaging notes
 
 ## Quickstart
 
@@ -144,6 +145,7 @@ Verify does not import maps, execute maps, download remote files, or call extern
 ## More docs
 
 - [docs/INSTALL.md](docs/INSTALL.md)
+- [docs/PACKAGING.md](docs/PACKAGING.md)
 - [docs/QUICKSTART.md](docs/QUICKSTART.md)
 - [docs/ROADMAP.md](docs/ROADMAP.md)
 - [demos/README.md](demos/README.md)

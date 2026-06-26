@@ -27,6 +27,8 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+Local editable install is still the recommended development setup.
+
 ## Future PyPI install
 
 ```powershell
@@ -60,6 +62,8 @@ runewall package status --json
 runewall package build-check
 runewall package build-check --json
 ```
+
+See [docs/PACKAGING.md](PACKAGING.md) for local artifact build notes and future PyPI readiness guidance.
 
 ## Safe first commands
 

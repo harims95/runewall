@@ -19,7 +19,12 @@
 
 - build artifact readiness check
 
+## v0.8.3
+
+- local packaging docs
+
 ## Future
 
 - actual build artifacts
 - PyPI publish
+- actual PyPI publish workflow
