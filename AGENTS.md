@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> **Note:** This file is for repository contributors and AI coding assistants working on this codebase. It is not Runewall's runtime agent model, product spec, or MCP protocol spec.
+
 Behavioral guidelines for Codex while building Runewall.
 
 These instructions reduce common LLM coding mistakes. Follow them together with the project brain and technical spec.
