@@ -119,6 +119,9 @@ class PackageVerifyReport:
     ok: bool
     path: str
     manifest_path: str | None
+    name: str | None
+    version: str | None
+    maps_count: int
     errors: list[str]
     validation_ok: bool
     validation_errors: list[str]
@@ -599,6 +602,7 @@ class SiteMapRegistry:
         if not path.exists():
             return PackageVerifyReport(
                 ok=False, path=resolved_path, manifest_path=None,
+                name=None, version=None, maps_count=0,
                 errors=[f"directory not found: {resolved_path}"],
                 validation_ok=False, validation_errors=[], validation_warnings=[],
                 checksums_verified=False,
@@ -607,6 +611,7 @@ class SiteMapRegistry:
         if not path.is_dir():
             return PackageVerifyReport(
                 ok=False, path=resolved_path, manifest_path=None,
+                name=None, version=None, maps_count=0,
                 errors=[f"not a directory: {resolved_path}"],
                 validation_ok=False, validation_errors=[], validation_warnings=[],
                 checksums_verified=False,
@@ -617,6 +622,7 @@ class SiteMapRegistry:
         if manifest_path is None:
             return PackageVerifyReport(
                 ok=False, path=resolved_path, manifest_path=None,
+                name=None, version=None, maps_count=0,
                 errors=["no manifest.json or manifest.example.json found in directory"],
                 validation_ok=False, validation_errors=[], validation_warnings=[],
                 checksums_verified=False,
@@ -648,6 +654,9 @@ class SiteMapRegistry:
             ok=ok,
             path=resolved_path,
             manifest_path=str(manifest_path),
+            name=report.name,
+            version=report.version,
+            maps_count=report.maps_count,
             errors=errors,
             validation_ok=report.ok,
             validation_errors=report.errors,

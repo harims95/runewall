@@ -74,6 +74,20 @@ See [docs/COMMUNITY_MAP_MANIFEST.md](COMMUNITY_MAP_MANIFEST.md) for the manifest
 - Reports trusted key status if the manifest includes a future `signing.public_key_id`.
 - Does not import or execute anything.
 
+## Package verify JSON contract
+
+`runewall maps community package verify <directory> --json` returns a stable machine-readable contract intended for agents and CI.
+
+Main keys:
+
+- `ok`
+- `package`
+- `validation`
+- `checksums`
+- `signing`
+- `trusted_key`
+- `safety`
+
 ## Package import
 
 `runewall maps community package import <directory>` imports map files from a local community map package.

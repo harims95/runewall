@@ -1688,6 +1688,16 @@ def main(argv: list[str] | None = None) -> int:
                     return 0 if pkg.ok else 1
                 if args.maps_community_package_command == "verify":
                     report = registry.verify_package_directory(Path(args.path), Path.cwd())
+                    package = {
+                        "name": report.name,
+                        "version": report.version,
+                        "maps_count": report.maps_count,
+                    }
+                    validation = {
+                        "ok": report.validation_ok,
+                        "errors": report.validation_errors,
+                        "warnings": report.validation_warnings,
+                    }
                     trusted_key = {
                         "checked": report.trusted_key_checked,
                         "status": report.trusted_key_status,
@@ -1697,6 +1707,7 @@ def main(argv: list[str] | None = None) -> int:
                     _signing = {"implemented": False, "verified": False}
                     _safety = {
                         "execute_enabled": False,
+                        "community_execution_enabled": False,
                         "remote_downloads": False,
                         "external_api_calls": False,
                     }
@@ -1706,11 +1717,8 @@ def main(argv: list[str] | None = None) -> int:
                                 "ok": True,
                                 "path": report.path,
                                 "manifest": report.manifest_path,
-                                "validation": {
-                                    "ok": report.validation_ok,
-                                    "errors": report.validation_errors,
-                                    "warnings": report.validation_warnings,
-                                },
+                                "package": package,
+                                "validation": validation,
                                 "checksums": _checksums,
                                 "signing": _signing,
                                 "trusted_key": trusted_key,
@@ -1722,6 +1730,11 @@ def main(argv: list[str] | None = None) -> int:
                             "path": report.path,
                             "manifest": report.manifest_path,
                             "errors": report.errors,
+                            "validation": {
+                                "ok": False,
+                                "errors": report.validation_errors,
+                                "warnings": report.validation_warnings,
+                            },
                             "checksums": _checksums,
                             "signing": _signing,
                             "trusted_key": trusted_key,
