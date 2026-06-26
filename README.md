@@ -1,11 +1,12 @@
 # Runewall
 
+[![PyPI](https://img.shields.io/pypi/v/runewall.svg)](https://pypi.org/project/runewall/)
+[![CI](https://github.com/harims95/runewall/actions/workflows/ci.yml/badge.svg)](https://github.com/harims95/runewall/actions/workflows/ci.yml)
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 ![Local-first](https://img.shields.io/badge/local--first-yes-lightgrey.svg)
 ![CLI-first](https://img.shields.io/badge/cli--first-yes-lightgrey.svg)
 ![MCP-ready](https://img.shields.io/badge/MCP-ready-orange.svg)
-![Tests](https://img.shields.io/badge/tests-local-blueviolet.svg)
 
 Runewall is a local-first safety/runtime layer for AI agents before they take real-world actions.
 
@@ -43,10 +44,10 @@ Start with the five-minute quickstart below, or run the 60-second local demo in 
 
 ## 5-minute quickstart
 
-Open this folder in VS Code, then run:
+Install and run:
 
 ```powershell
-python -m pip install -e ".[dev]"
+pip install runewall
 runewall version
 runewall config profile safe
 runewall policy audit
@@ -65,6 +66,8 @@ What this gives you:
 - verifies a local community package without importing it
 - shows local MCP status
 - shows local SDK status
+
+For local development, use `pip install -e ".[dev]"` instead. See [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Status
 
@@ -97,42 +100,31 @@ Included in v1.0.0:
 
 ## Install
 
-See [docs/INSTALL.md](docs/INSTALL.md) for Windows PowerShell-first setup.
+```powershell
+pip install runewall
+```
+
+See [docs/INSTALL.md](docs/INSTALL.md) for Windows PowerShell-first setup and editable installs.
 
 ## Install status
 
-- local editable install is supported
-- v1.0.0 is published on PyPI
-- use [docs/INSTALL.md](docs/INSTALL.md) for setup
+- `pip install runewall` for normal use
+- `pip install -e ".[dev]"` for local development
 - see [docs/PACKAGING.md](docs/PACKAGING.md) for local packaging notes
 - `runewall package pypi-check` is a local readiness check only
 - `runewall package dist-check` is a local artifact presence check only
 
-## Quickstart
-
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for a safe first walkthrough.
-
 ## Demo
 
-See [demos/README.md](demos/README.md) for a 60-second local-only, token-free demo.
-
-## 60-second demo
-
-Run the local demo with:
+Run the 60-second local demo with:
 
 ```powershell
 .\demos\runewall_60_second_demo.ps1
 ```
 
-It shows:
+It shows: version, safe profile, policy audit, dry-run, community package verify, MCP status, SDK status.
 
-- version
-- safe profile
-- policy audit
-- dry-run
-- community package verify
-- MCP status
-- SDK status
+See [demos/README.md](demos/README.md) for details.
 
 ## MCP
 
