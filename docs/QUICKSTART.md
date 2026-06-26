@@ -2,6 +2,17 @@
 
 This is a safe first walkthrough for trying Runewall locally in a few minutes.
 
+Recommended starting commands:
+
+```powershell
+python -m pip install -e ".[dev]"
+runewall version
+runewall config profile safe
+runewall policy audit
+runewall maps community package verify examples/community-maps --json
+.\demos\runewall_60_second_demo.ps1
+```
+
 ## 1. Apply the safe profile
 
 ```powershell

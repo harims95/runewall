@@ -1,5 +1,12 @@
 # Runewall
 
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+![Local-first](https://img.shields.io/badge/local--first-yes-lightgrey.svg)
+![CLI-first](https://img.shields.io/badge/cli--first-yes-lightgrey.svg)
+![MCP-ready](https://img.shields.io/badge/MCP-ready-orange.svg)
+![Tests](https://img.shields.io/badge/tests-local-blueviolet.svg)
+
 Runewall is a local-first safety/runtime layer for AI agents before they take real-world actions.
 
 ## Why it exists
@@ -21,6 +28,10 @@ Agents are moving from answering to acting. Before they touch files, APIs, or to
 - local MCP stdio surface
 - Python SDK preview
 - community map package verification
+
+## How do I try it?
+
+Start with the five-minute quickstart below, or run the local demo in [demos/README.md](demos/README.md).
 
 ## 5-minute quickstart
 
@@ -45,7 +56,24 @@ What this gives you:
 - shows local MCP status
 - shows local SDK status
 
-## Safety defaults
+## Status
+
+Runewall is currently a local-first CLI/devtool with:
+
+- core safety runtime
+- MCP stdio surface
+- Python SDK preview
+- community package verification
+
+Not included yet:
+
+- hosted service
+- dashboard
+- remote registry
+- real signature verification
+- community map execution
+
+## Safe by default
 
 - real execution is disabled by default
 - dry-run does not call external APIs
@@ -53,6 +81,7 @@ What this gives you:
 - tokens are never printed, stored, or logged
 - community maps are non-executable
 - package verify does not import or execute maps
+- no hosted backend is required
 
 ## Install
 

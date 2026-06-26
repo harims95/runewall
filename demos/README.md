@@ -21,6 +21,8 @@ The demo is local-only, token-free, and does not call external APIs.
 ```powershell
 cd C:\Users\Asus\Desktop\runewall\runewall-starter
 .\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+runewall version
 .\demos\runewall_60_second_demo.ps1
 ```
 

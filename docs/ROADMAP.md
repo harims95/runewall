@@ -2,15 +2,15 @@
 
 ## Current
 
-- CLI safety runtime
-- MCP local stdio
+- local safety runtime
+- MCP stdio
 - Python SDK preview
 - community package verify
+- 60-second demo
 
 ## Next
 
-- public polish
-- install docs
-- demo script
-- real signature verification later
-- MCP/SDK approve/execute lifecycle later
+- real signature verification
+- stronger agent integration examples
+- MCP/SDK approve-execute lifecycle
+- packaging/PyPI polish
