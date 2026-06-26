@@ -1,0 +1,2 @@
+﻿examples/community-maps/*.json text eol=lf
+examples/community-maps/**/*.json text eol=lf
