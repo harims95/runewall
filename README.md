@@ -43,6 +43,8 @@ Start with the five-minute quickstart below, or run the 60-second local demo in 
 
 ## 5-minute quickstart
 
+Open this folder in VS Code, then run:
+
 ```powershell
 python -m pip install -e ".[dev]"
 runewall version
