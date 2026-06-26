@@ -68,7 +68,9 @@ What this gives you:
 
 ## Status
 
-Runewall is currently a local-first CLI/devtool with:
+Runewall v1.0.0 is the stable local-first foundation: CLI safety runtime, dry-run, policy checks, local logs, snapshots/rollback, community package verification, MCP status/tools, and SDK preview. It is not a hosted service and does not yet include real signature verification, community map execution, or the full approve/execute lifecycle over MCP/SDK. Future security and integration features will ship as v1.x releases.
+
+Included in v1.0.0:
 
 - core safety runtime
 - MCP stdio surface
@@ -100,7 +102,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) for Windows PowerShell-first setup.
 ## Install status
 
 - local editable install is supported
-- PyPI publishing is future work
+- v1.0.0 is published on PyPI
 - use [docs/INSTALL.md](docs/INSTALL.md) for setup
 - see [docs/PACKAGING.md](docs/PACKAGING.md) for local packaging notes
 - `runewall package pypi-check` is a local readiness check only
